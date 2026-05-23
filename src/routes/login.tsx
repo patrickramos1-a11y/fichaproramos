@@ -1,119 +1,183 @@
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { UserPlus, User } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
   head: () => ({ meta: [{ title: "Entrar - Ramos Engenharia" }] }),
 });
 
+// Senha fixa interna — o usuário não precisa saber nem digitar.
+const FIXED_PW = "ramos-app-fixed-pw-2025";
+const emailFor = (name: string) =>
+  `${name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")}@app.local`;
+
+type AppUser = { id: string; name: string; email: string };
+
 function LoginPage() {
   const navigate = useNavigate();
-  const router = useRouter();
-  const [tab, setTab] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newName, setNewName] = useState("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/" });
     });
+    void loadUsers();
   }, [navigate]);
 
-  const onSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const loadUsers = async () => {
+    const { data, error } = await supabase
+      .from("app_users")
+      .select("id, name, email")
+      .order("name", { ascending: true });
+    if (error) return toast.error("Não foi possível carregar os usuários");
+    setUsers((data ?? []) as AppUser[]);
+  };
+
+  const signInAs = async (u: AppUser) => {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: u.email,
+      password: FIXED_PW,
+    });
     setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("Bem-vindo!");
-    router.invalidate();
+    if (error) return toast.error("Não foi possível entrar como " + u.name);
+    toast.success(`Bem-vindo, ${u.name}!`);
     navigate({ to: "/" });
   };
 
-  const onSignUp = async (e: React.FormEvent) => {
+  const addUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    const name = newName.trim();
+    if (!name) return;
+    if (users.some((u) => u.name.toLowerCase() === name.toLowerCase())) {
+      return toast.error("Já existe um usuário com esse nome");
+    }
+    const email = emailFor(name);
+    if (!email.includes("@")) return toast.error("Nome inválido");
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { error: signUpErr } = await supabase.auth.signUp({
       email,
-      password,
-      options: { emailRedirectTo: window.location.origin },
+      password: FIXED_PW,
     });
+    if (signUpErr && !signUpErr.message.toLowerCase().includes("registered")) {
+      setLoading(false);
+      return toast.error(signUpErr.message);
+    }
+    // Faz login para conseguir inserir na tabela (RLS exige auth.uid).
+    const { error: signInErr } = await supabase.auth.signInWithPassword({
+      email,
+      password: FIXED_PW,
+    });
+    if (signInErr) {
+      setLoading(false);
+      return toast.error(signInErr.message);
+    }
+    const { error: insErr } = await supabase
+      .from("app_users")
+      .insert({ name, email });
+    if (insErr && !insErr.message.toLowerCase().includes("duplicate")) {
+      setLoading(false);
+      return toast.error(insErr.message);
+    }
     setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("Conta criada! Você já pode entrar.");
-    setTab("signin");
-  };
-
-  const onGoogle = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    if (result.error) toast.error("Falha no login com Google");
-  };
-
-  const onForgot = async () => {
-    if (!email) return toast.error("Informe seu e-mail acima");
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (error) return toast.error(error.message);
-    toast.success("Enviamos um link para seu e-mail.");
+    toast.success(`Usuário ${name} criado!`);
+    setNewName("");
+    setShowAdd(false);
+    navigate({ to: "/" });
   };
 
   return (
-    <div className="min-h-screen grid place-items-center bg-background px-4">
+    <div className="min-h-screen grid place-items-center bg-background px-4 py-8">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-md bg-primary text-primary-foreground font-bold text-xl">R</div>
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-md bg-primary text-primary-foreground font-bold text-xl">
+            R
+          </div>
           <h1 className="mt-3 text-xl font-semibold">Ramos Engenharia</h1>
           <p className="text-sm text-muted-foreground">Levantamento de Campo</p>
         </div>
-        <Tabs value={tab} onValueChange={(v) => setTab(v as "signin" | "signup")}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="signin">Entrar</TabsTrigger>
-            <TabsTrigger value="signup">Criar conta</TabsTrigger>
-          </TabsList>
-          <TabsContent value="signin">
-            <form onSubmit={onSignIn} className="space-y-3 mt-4">
-              <div className="space-y-1">
-                <Label htmlFor="email-i">E-mail</Label>
-                <Input id="email-i" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+
+        {!showAdd ? (
+          <>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground text-center">
+                Selecione seu usuário para entrar
+              </p>
+              <div className="space-y-2">
+                {users.length === 0 && (
+                  <p className="text-center text-sm text-muted-foreground py-6">
+                    Nenhum usuário cadastrado.
+                  </p>
+                )}
+                {users.map((u) => (
+                  <button
+                    key={u.id}
+                    onClick={() => signInAs(u)}
+                    disabled={loading}
+                    className="w-full flex items-center gap-3 rounded-md border border-border bg-card px-4 py-3 text-left hover:bg-secondary transition-colors disabled:opacity-50"
+                  >
+                    <div className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-primary">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <span className="font-medium">{u.name}</span>
+                  </button>
+                ))}
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="pw-i">Senha</Label>
-                <Input id="pw-i" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>Entrar</Button>
-              <button type="button" onClick={onForgot} className="text-xs text-muted-foreground hover:underline w-full text-center">
-                Esqueci minha senha
-              </button>
-            </form>
-          </TabsContent>
-          <TabsContent value="signup">
-            <form onSubmit={onSignUp} className="space-y-3 mt-4">
-              <div className="space-y-1">
-                <Label htmlFor="email-s">E-mail</Label>
-                <Input id="email-s" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="pw-s">Senha (mín. 8)</Label>
-                <Input id="pw-s" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>Criar conta</Button>
-            </form>
-          </TabsContent>
-        </Tabs>
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-          <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">ou</span></div>
-        </div>
-        <Button variant="outline" className="w-full" onClick={onGoogle}>Continuar com Google</Button>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowAdd(true)}
+              disabled={loading}
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Cadastrar novo usuário
+            </Button>
+          </>
+        ) : (
+          <form onSubmit={addUser} className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="new-name">Nome do usuário</Label>
+              <Input
+                id="new-name"
+                autoFocus
+                required
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Ex: João Silva"
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              Cadastrar e entrar
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => {
+                setShowAdd(false);
+                setNewName("");
+              }}
+              disabled={loading}
+            >
+              Voltar
+            </Button>
+          </form>
+        )}
       </div>
     </div>
   );

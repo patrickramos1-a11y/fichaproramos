@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ClienteForm, emptyClienteForm, type ClienteFormValue } from "@/components/ClienteForm";
 import { Plus, Search, Users, ArrowRight, Building2 } from "lucide-react";
+import { getSurveyClientId } from "@/lib/surveyRelations";
 
 export const Route = createFileRoute("/clientes/")({
   head: () => ({ meta: [{ title: "Clientes — Ramos Engenharia" }] }),
@@ -37,10 +38,9 @@ function ClientesList() {
   const counts = useMemo(() => {
     const projByClient = new Map<string, number>();
     for (const p of db.projects) projByClient.set(p.clientId, (projByClient.get(p.clientId) ?? 0) + 1);
-    const projToClient = new Map(db.projects.map((p) => [p.id, p.clientId]));
     const survByClient = new Map<string, number>();
     for (const s of db.surveys) {
-      const cid = projToClient.get(s.projectId);
+      const cid = getSurveyClientId(s, db.projects);
       if (cid) survByClient.set(cid, (survByClient.get(cid) ?? 0) + 1);
     }
     return { projByClient, survByClient };

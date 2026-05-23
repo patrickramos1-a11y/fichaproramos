@@ -9,13 +9,14 @@ import {
   Copy, FileDown, FileText, Code2, Sparkles, Pencil, Printer, AlertTriangle, Image as ImageIcon, Mic,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
 
 export function RelatorioDetalhado({ surveyId, onOpenEditor }: { surveyId: string; onOpenEditor: (moduleId?: string) => void }) {
   const data = useDBSelector(
     (s) => {
       const survey = s.surveys.find((x) => x.id === surveyId) ?? null;
-      const project = survey ? s.projects.find((p) => p.id === survey.projectId) ?? null : null;
-      const client = project ? s.clients.find((c) => c.id === project.clientId) ?? null : null;
+      const project = survey ? getSurveyProject(survey, s.projects) ?? null : null;
+      const client = survey ? getSurveyClient(survey, s.clients, s.projects) ?? null : null;
       return { survey, project, client };
     },
     (a, b) => a.survey === b.survey && a.client === b.client && a.project === b.project,

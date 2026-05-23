@@ -2,12 +2,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import {
   useDB, addSurveyExt, addClient, useCustomSurveyTypes,
-  getOrCreateDefaultProjectForClient,
 } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { type SurveyType } from "@/lib/types";
 import { useMemo, useState } from "react";
 import { autoColor } from "@/lib/colors";
@@ -15,21 +15,29 @@ import { getTypeIcon } from "@/lib/typeIcons";
 import { Search, UserPlus, Check } from "lucide-react";
 
 export const Route = createFileRoute("/levantamentos/novo")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    clientId: typeof search.clientId === "string" ? search.clientId : undefined,
+  }),
   component: NovoPage,
 });
 
 function NovoPage() {
   const db = useDB();
+  const search = Route.useSearch();
   const allTypes = useCustomSurveyTypes().filter((c) => !c.archivedAt && !c.inactive);
   const nav = useNavigate();
   const [customTypeId, setCustomTypeId] = useState<string | undefined>(allTypes[0]?.id);
   const [title, setTitle] = useState("");
-  const [clientId, setClientId] = useState<string>("");
+  const [clientId, setClientId] = useState<string>(search.clientId ?? "");
+  const [empreendimentoId, setEmpreendimentoId] = useState<string>("none");
+  const [projectId, setProjectId] = useState<string>("none");
   const [clientQuery, setClientQuery] = useState("");
 
   const selected = allTypes.find((c) => c.id === customTypeId) ?? allTypes[0];
   const effectiveType: SurveyType = (selected?.sourceTypeId as SurveyType | undefined) ?? selected?.id ?? "geral";
   const selectedClient = db.clients.find((c) => c.id === clientId);
+  const clientEmpreendimentos = db.empreendimentos.filter((e) => e.clientId === clientId);
+  const clientProjects = db.projects.filter((p) => p.clientId === clientId);
 
   const filteredClients = useMemo(() => {
     const q = clientQuery.trim().toLowerCase();
@@ -56,14 +64,17 @@ function NovoPage() {
     if (!name) return;
     const c = addClient({ name, personType: "PJ" });
     setClientId(c.id);
+    setEmpreendimentoId("none");
+    setProjectId("none");
     setClientQuery("");
   }
 
   function submit() {
     if (!clientId || !selected) return;
-    const project = getOrCreateDefaultProjectForClient(clientId);
     const s = addSurveyExt({
-      projectId: project.id,
+      clientId,
+      empreendimentoId: empreendimentoId === "none" ? undefined : empreendimentoId,
+      projectId: projectId === "none" ? undefined : projectId,
       type: effectiveType,
       title: title || defaultTitle(),
       customTypeId: selected.id,
@@ -90,7 +101,7 @@ function NovoPage() {
                     </div>
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setClientId("")}>Trocar</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setClientId(""); setEmpreendimentoId("none"); setProjectId("none"); }}>Trocar</Button>
               </div>
             ) : (
               <div className="mt-2 grid gap-2">
@@ -138,6 +149,41 @@ function NovoPage() {
               </div>
             )}
           </div>
+          {selectedClient && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Empreendimento</Label>
+                <Select value={empreendimentoId} onValueChange={setEmpreendimentoId}>
+                  <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem empreendimento</SelectItem>
+                    {clientEmpreendimentos.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Projeto</Label>
+                <Select value={projectId} onValueChange={(value) => {
+                  setProjectId(value);
+                  const project = db.projects.find((p) => p.id === value);
+                  if (project?.empreendimentoId) setEmpreendimentoId(project.empreendimentoId);
+                }}>
+                  <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem projeto</SelectItem>
+                    {clientProjects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-[11px] text-muted-foreground sm:col-span-2">
+                Projeto e empreendimento agora são contexto opcional; o vínculo principal é o cliente.
+              </p>
+            </div>
+          )}
           <div>
             <Label className="mb-2 block">Tipo de levantamento</Label>
             <div className="grid gap-2">

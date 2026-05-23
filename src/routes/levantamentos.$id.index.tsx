@@ -37,6 +37,7 @@ import { PhotoAttachmentsPanel } from "@/components/PhotoAttachmentsPanel";
 import { type FieldStatus, type FieldDef, type SubgroupDef, type ModuleState } from "@/lib/types";
 import { FinalidadeCard } from "@/components/FinalidadeCard";
 import { VisaoConsolidada } from "@/components/survey/VisaoConsolidada";
+import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
 const RelatorioDetalhado = lazy(() =>
   import("@/components/survey/RelatorioDetalhado").then((m) => ({ default: m.RelatorioDetalhado })),
 );
@@ -59,8 +60,8 @@ function SurveyEditor() {
   const data = useDBSelector(
     (state) => {
       const survey = state.surveys.find((s) => s.id === id);
-      const project = survey ? state.projects.find((p) => p.id === survey.projectId) ?? null : null;
-      const client = project ? state.clients.find((c) => c.id === project.clientId) ?? null : null;
+      const project = survey ? getSurveyProject(survey, state.projects) ?? null : null;
+      const client = survey ? getSurveyClient(survey, state.clients, state.projects) ?? null : null;
       return { survey, project, client };
     },
     (a, b) => a.survey === b.survey && a.project === b.project && a.client === b.client,
@@ -80,7 +81,9 @@ function SurveyEditor() {
           <ArrowLeft className="h-4 w-4" /> Levantamentos
         </Link>
         <div className="mb-4">
-          <div className="text-xs text-muted-foreground">{client?.name} / {project?.name}</div>
+          <div className="text-xs text-muted-foreground">
+            {[client?.name, project?.name].filter(Boolean).join(" / ") || "Levantamento sem cliente identificado"}
+          </div>
           <h1 className="text-2xl font-semibold">{survey.title}</h1>
           {(persistPending || persistenceError) && <p className="text-xs text-muted-foreground mt-1">{persistenceError ?? "Salvando alterações..."}</p>}
         </div>
@@ -158,7 +161,7 @@ function SurveyEditorReady({ survey, projectName, clientName, activeTab, setActi
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="text-[11px] text-muted-foreground truncate">
-            {clientName} / {projectName} · {typeLabel}
+            {[clientName, projectName].filter(Boolean).join(" / ") || "Levantamento"} · {typeLabel}
           </div>
           <h1 className="text-base font-semibold flex items-center gap-2 truncate">
             <span className="truncate">{survey.title}</span>

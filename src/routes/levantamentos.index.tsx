@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ALL_SURVEY_PURPOSES, SURVEY_PURPOSE_LABELS, type SurveyPurpose } from "@/lib/types";
 import { PurposeChips } from "@/components/FinalidadeCard";
+import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
 
 export const Route = createFileRoute("/levantamentos/")({
   head: () => ({ meta: [{ title: "Levantamentos — Ramos Engenharia" }] }),
@@ -155,8 +156,10 @@ function ListPage() {
 
 function Row({ s, projectIndex, clientIndex, sel, onSel, compact }: { s: any; projectIndex: Map<string, any>; clientIndex: Map<string, any>; sel: boolean; onSel: () => void; compact?: boolean }) {
   const t = getSurveyTypeMeta(s.type, s.customTypeId);
-  const proj = projectIndex.get(s.projectId);
-  const client = proj ? clientIndex.get(proj.clientId) : null;
+  const projects = Array.from(projectIndex.values());
+  const clients = Array.from(clientIndex.values());
+  const proj = getSurveyProject(s, projects);
+  const client = getSurveyClient(s, clients, projects);
   const total = Object.keys(s.modules).length || 1;
   const done = Object.values(s.modules).filter((m: any) => m.status === "concluido").length;
   return (
@@ -169,7 +172,9 @@ function Row({ s, projectIndex, clientIndex, sel, onSel, compact }: { s: any; pr
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-medium truncate">{s.title}</div>
-            <div className="text-[11px] text-muted-foreground truncate">{t.label} · {client?.name ?? "—"}</div>
+            <div className="text-[11px] text-muted-foreground truncate">
+              {t.label} · {client?.name ?? "Cliente não identificado"}{proj ? ` · ${proj.name}` : ""}
+            </div>
             <div className="mt-1"><PurposeChips purposes={s.purposes} max={compact ? 3 : 5} /></div>
           </div>
           <div className="text-[11px] text-muted-foreground shrink-0">{done}/{total}</div>

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { MODULES, MODULES_BY_TYPE, getModulesForType } from "@/lib/modules";
+import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
 import {
   SURVEY_TYPES,
   SURVEY_PURPOSE_LABELS,
@@ -94,13 +95,11 @@ export function BuscaGlobalTab({ onOpen }: { onOpen: (moduleId: string) => void 
     }
 
     // 3) Levantamentos
-    const clientById = new Map(db.clients.map((c) => [c.id, c]));
-    const projectById = new Map(db.projects.map((p) => [p.id, p]));
     for (const s of db.surveys) {
       const hay = `${s.title ?? ""} ${s.responsavel ?? ""} ${s.realizadoPor ?? ""}`.toLowerCase();
       if (hay.includes(term)) {
-        const proj = projectById.get(s.projectId);
-        const client = proj ? clientById.get(proj.clientId) : undefined;
+        const proj = getSurveyProject(s, db.projects);
+        const client = getSurveyClient(s, db.clients, db.projects);
         out.push({
           kind: "survey", id: s.id, title: s.title || "(sem título)",
           clientName: client?.name, status: s.closedAt ? "Concluído" : "Em andamento",

@@ -7,6 +7,7 @@ import { getEffectiveModulesForCustomType, getEffectiveModulesForType } from "@/
 import { StatusBadge } from "@/components/StatusBadge";
 import { PhotoAttachmentsPanel } from "@/components/PhotoAttachmentsPanel";
 import { useEffect, useState } from "react";
+import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
 
 export const Route = createFileRoute("/levantamentos/$id/resumo")({
   component: ResumoPage,
@@ -39,6 +40,10 @@ function fmtVal(v: any): string {
   return String(v);
 }
 
+function hasVal(v: any): boolean {
+  return fmtVal(v) !== "—";
+}
+
 function ResumoPage() {
   const { id } = Route.useParams();
   const { hydrated } = useDBStatus();
@@ -48,8 +53,8 @@ function ResumoPage() {
   if (!mounted || !hydrated) return <AppShell><p>Carregando resumo...</p></AppShell>;
   const survey = db.surveys.find((s) => s.id === id);
   if (!survey) return <AppShell><p>Não encontrado.</p></AppShell>;
-  const project = db.projects.find((p) => p.id === survey.projectId);
-  const client = project ? db.clients.find((c) => c.id === project.clientId) : null;
+  const project = getSurveyProject(survey, db.projects);
+  const client = getSurveyClient(survey, db.clients, db.projects);
   const customType = survey.customTypeId
     ? db.customSurveyTypes.find((type) => type.id === survey.customTypeId)
     : undefined;
@@ -66,7 +71,9 @@ function ResumoPage() {
 
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <div className="text-xs text-muted-foreground">{client?.name} / {project?.name}</div>
+          <div className="text-xs text-muted-foreground">
+            {[client?.name, project?.name].filter(Boolean).join(" / ") || "Levantamento sem cliente identificado"}
+          </div>
           <h1 className="text-2xl font-semibold">{survey.title}</h1>
           <div className="text-sm text-muted-foreground">{typeLabel}</div>
         </div>
@@ -80,6 +87,17 @@ function ResumoPage() {
 
         {modules.map((m) => {
           const st = survey.modules[m.id];
+          if (!st || st.naModule) return null;
+          const topFields = m.fields.filter((f) => !st.nonApplicable?.[f.id] && hasVal(st.values[f.id]));
+          const visibleSubgroups = (m.subgroups ?? [])
+            .filter((sg) => !st.naSubgroups?.[sg.id])
+            .map((sg) => ({
+              sg,
+              fields: sg.fields.filter((f) => !st.nonApplicable?.[f.id] && hasVal(st.values[f.id])),
+            }))
+            .filter(({ fields }) => fields.length > 0);
+          const imageAttachments = (st.attachments ?? []).filter((a) => a.type.startsWith("image/"));
+          if (!topFields.length && !visibleSubgroups.length && !st.notes && !imageAttachments.length) return null;
           return (
             <Card key={m.id}>
               <CardContent className="p-5">
@@ -87,24 +105,26 @@ function ResumoPage() {
                   <h2 className="font-semibold">{m.title}</h2>
                   <StatusBadge status={st.status} />
                 </div>
-                <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                  {m.fields.map((f) => (
-                    <div key={f.id} className="flex justify-between gap-3 border-b border-border/50 py-1">
-                      <dt className="text-muted-foreground">{f.label}</dt>
-                      <dd className="text-right font-medium">{fmtVal(st.values[f.id])}</dd>
-                    </div>
-                  ))}
-                </dl>
-                {m.id !== "fotos" && m.subgroups?.length ? (
+                {topFields.length > 0 && (
+                  <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                    {topFields.map((f) => (
+                      <div key={f.id} className="flex justify-between gap-3 border-b border-border/50 py-1">
+                        <dt className="text-muted-foreground">{f.label}</dt>
+                        <dd className="text-right font-medium">{fmtVal(st.values[f.id])}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                {m.id !== "fotos" && visibleSubgroups.length ? (
                   <div className="mt-4 space-y-4">
-                    {m.subgroups.map((sg) => (
+                    {visibleSubgroups.map(({ sg, fields }) => (
                       <div key={sg.id} className="rounded-md border border-border/60 p-4">
                         <div className="mb-2">
                           <h3 className="text-sm font-semibold">{sg.title}</h3>
                           {sg.description ? <p className="text-xs text-muted-foreground">{sg.description}</p> : null}
                         </div>
                         <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                          {sg.fields.map((f) => (
+                          {fields.map((f) => (
                             <div key={f.id} className="flex justify-between gap-3 border-b border-border/50 py-1">
                               <dt className="text-muted-foreground">{f.label}</dt>
                               <dd className="text-right font-medium">{fmtVal(st.values[f.id])}</dd>
@@ -116,9 +136,9 @@ function ResumoPage() {
                   </div>
                 ) : null}
                 {st.notes && <p className="text-sm mt-3 text-muted-foreground italic">{st.notes}</p>}
-                {st.attachments.length > 0 && (
+                {imageAttachments.length > 0 && (
                   <div className="mt-3 grid sm:grid-cols-3 gap-2">
-                    {st.attachments.filter((a) => a.type.startsWith("image/")).map((a) => (
+                    {imageAttachments.map((a) => (
                       <img key={a.id} src={a.dataUrl} alt={a.name} className="rounded-md border border-border h-32 w-full object-cover" />
                     ))}
                   </div>

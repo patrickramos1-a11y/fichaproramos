@@ -44,7 +44,9 @@ function ProjetoDetail() {
     if (!selected) return;
     const effectiveType: SurveyType = (selected.sourceTypeId as SurveyType | undefined) ?? selected.id;
     const s = addSurveyExt({
+      clientId: project.clientId,
       projectId: id,
+      empreendimentoId: project.empreendimentoId,
       type: effectiveType,
       title: title || selected.label,
       customTypeId: selected.id,

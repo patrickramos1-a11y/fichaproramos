@@ -366,7 +366,9 @@ export interface Pendencia {
 
 export interface Survey {
   id: string;
-  projectId: string;
+  clientId: string;
+  projectId?: string;
+  empreendimentoId?: string;
   type: SurveyType;
   title: string;
   date: string;

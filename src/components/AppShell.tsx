@@ -11,6 +11,13 @@ const nav = [
   { to: "/configuracoes", label: "Config.", icon: Settings },
 ] as const;
 
+const mobileNav = [
+  { to: "/", label: "Inicio", icon: LayoutDashboard },
+  { to: "/clientes", label: "Clientes", icon: Users },
+  { to: "/levantamentos", label: "Campo", icon: ClipboardList },
+  { to: "/configuracoes", label: "Config.", icon: Settings },
+] as const;
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const loc = useLocation();
   const navigate = useNavigate();
@@ -46,7 +53,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         {/* Linha 2: navegação rolável (mobile) / inline (desktop) */}
         <nav
-          className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-2 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="mx-auto hidden max-w-7xl gap-1 overflow-x-auto px-2 pb-2 md:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           aria-label="Navegação principal"
         >
           {nav.map((n) => {
@@ -68,7 +75,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
       </header>
-      <main className="mx-auto w-full max-w-7xl px-3 py-4 md:px-4 md:py-6 min-w-0">{children}</main>
+      <main className="mx-auto w-full max-w-7xl px-3 py-4 pb-28 md:px-4 md:py-6 min-w-0">{children}</main>
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 shadow-lg backdrop-blur md:hidden"
+        aria-label="Navegação principal mobile"
+      >
+        <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
+          {mobileNav.map((n) => {
+            const active = n.to === "/" ? loc.pathname === "/" : loc.pathname.startsWith(n.to);
+            return (
+              <Link
+                key={n.to}
+                to={n.to}
+                className={`flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg px-2 text-[11px] font-medium transition-colors ${
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                }`}
+              >
+                <n.icon className="h-5 w-5 shrink-0" />
+                <span className="max-w-full truncate">{n.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

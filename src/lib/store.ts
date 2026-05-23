@@ -121,7 +121,12 @@ function normalizeCustomSurveyType(type: CustomSurveyType): CustomSurveyType {
   };
 }
 
-function normalizeSurvey(survey: Survey): Survey {
+function normalizeSurvey(survey: Survey, projects: Project[] = store.db.projects): Survey {
+  const project = survey.projectId
+    ? projects.find((entry) => entry.id === survey.projectId)
+    : undefined;
+  const clientId = survey.clientId || project?.clientId || "";
+  const empreendimentoId = survey.empreendimentoId || project?.empreendimentoId;
   const nextModules = { ...(survey.modules ?? {}) };
   const moduleIdsToEnsure = new Set<string>(getModulesForType(survey.type).map((m) => m.id));
   if (survey.customTypeId) {
@@ -137,6 +142,8 @@ function normalizeSurvey(survey: Survey): Survey {
   }
   return {
     ...survey,
+    clientId,
+    empreendimentoId,
     modules: ensureLegacyAdapters(nextModules),
     pendencias: Array.isArray(survey.pendencias) ? survey.pendencias : [],
     signatures: survey.signatures ?? {},
@@ -144,11 +151,12 @@ function normalizeSurvey(survey: Survey): Survey {
 }
 
 function normalizeDB(raw: Partial<DB> | null | undefined): DB {
+  const projects = Array.isArray(raw?.projects) ? raw!.projects! : [];
   return {
     clients: Array.isArray(raw?.clients) ? raw!.clients! : [],
     empreendimentos: Array.isArray(raw?.empreendimentos) ? raw!.empreendimentos! : [],
-    projects: Array.isArray(raw?.projects) ? raw!.projects! : [],
-    surveys: Array.isArray(raw?.surveys) ? raw!.surveys!.map((s) => normalizeSurvey(s)) : [],
+    projects,
+    surveys: Array.isArray(raw?.surveys) ? raw!.surveys!.map((s) => normalizeSurvey(s, projects)) : [],
     templates: Array.isArray(raw?.templates) ? raw!.templates! : [],
     formOverrides: (raw?.formOverrides && typeof raw.formOverrides === "object") ? raw.formOverrides as FormStructureOverrides : {},
     customSurveyTypes: Array.isArray(raw?.customSurveyTypes)
@@ -209,7 +217,7 @@ function rowFor(table: TableName, item: any): Record<string, any> {
     case "clients": return { id: item.id, data: item };
     case "empreendimentos": return { id: item.id, client_id: item.clientId, data: item };
     case "projects": return { id: item.id, client_id: item.clientId, empreendimento_id: item.empreendimentoId ?? null, data: item };
-    case "surveys": return { id: item.id, project_id: item.projectId, data: item };
+    case "surveys": return { id: item.id, project_id: item.projectId ?? `client:${item.clientId ?? "direct"}`, data: item };
     case "survey_templates": return { id: item.id, data: item };
     case "custom_survey_types": return { id: item.id, data: item };
   }
@@ -571,7 +579,10 @@ export function deleteClient(cid: string) {
     clients: store.db.clients.filter((client) => client.id !== cid),
     empreendimentos: store.db.empreendimentos.filter((empreendimento) => empreendimento.clientId !== cid),
     projects: remainingProjects,
-    surveys: store.db.surveys.filter((survey) => remainingProjectIds.has(survey.projectId)),
+    surveys: store.db.surveys.filter((survey) => {
+      if (survey.clientId === cid) return false;
+      return survey.projectId ? remainingProjectIds.has(survey.projectId) : true;
+    }),
   };
   persist();
 }
@@ -596,6 +607,7 @@ export function deleteEmpreendimento(eid: string) {
     ...store.db,
     empreendimentos: store.db.empreendimentos.filter((empreendimento) => empreendimento.id !== eid),
     projects: store.db.projects.map((project) => (project.empreendimentoId === eid ? { ...project, empreendimentoId: undefined } : project)),
+    surveys: store.db.surveys.map((survey) => (survey.empreendimentoId === eid ? { ...survey, empreendimentoId: undefined } : survey)),
   };
   persist();
 }
@@ -611,17 +623,29 @@ export function deleteProject(pid: string) {
   store.db = {
     ...store.db,
     projects: store.db.projects.filter((project) => project.id !== pid),
-    surveys: store.db.surveys.filter((survey) => survey.projectId !== pid),
+    surveys: store.db.surveys.map((survey) => (survey.projectId === pid ? { ...survey, projectId: undefined } : survey)),
   };
   persist();
 }
 
-export function addSurvey(data: { projectId: string; type: SurveyType; title: string }) {
+export function addSurvey(data: { clientId: string; projectId?: string; empreendimentoId?: string; type: SurveyType; title: string }) {
   return addSurveyExt({ ...data });
 }
 
 /** Versão extendida de addSurvey que aceita customTypeId. */
-export function addSurveyExt(data: { projectId: string; type: SurveyType; title: string; customTypeId?: string }) {
+export function addSurveyExt(data: {
+  clientId: string;
+  projectId?: string;
+  empreendimentoId?: string;
+  type: SurveyType;
+  title: string;
+  customTypeId?: string;
+}) {
+  const project = data.projectId ? store.db.projects.find((entry) => entry.id === data.projectId) : undefined;
+  const clientId = data.clientId || project?.clientId;
+  if (!clientId) {
+    throw new Error("Levantamento precisa estar vinculado a um cliente.");
+  }
   const modules: Record<string, ModuleState> = {};
   const moduleIds = new Set<string>();
   getModulesForType(data.type).forEach((m) => moduleIds.add(m.id));
@@ -654,7 +678,9 @@ export function addSurveyExt(data: { projectId: string; type: SurveyType; title:
 
   const survey: Survey = {
     id: id(),
+    clientId,
     projectId: data.projectId,
+    empreendimentoId: data.empreendimentoId || project?.empreendimentoId,
     type: data.type,
     title: data.title,
     date: todayISO,
@@ -726,13 +752,6 @@ export function setSurveyPurposes(sid: string, purposes: import("./types").Surve
     surveys: store.db.surveys.map((s) => (s.id === sid ? { ...s, purposes } : s)),
   };
   persist();
-}
-
-/** Garante que cliente tenha um projeto onde alocar levantamentos (cria "Levantamentos" se não houver). */
-export function getOrCreateDefaultProjectForClient(clientId: string): Project {
-  const existing = store.db.projects.find((p) => p.clientId === clientId);
-  if (existing) return existing;
-  return addProject({ clientId, name: "Levantamentos" });
 }
 
 export function closeSurvey(sid: string, horaSaida?: string) {

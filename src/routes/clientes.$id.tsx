@@ -1,16 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
-import { useDB, addProject, deleteProject, addEmpreendimento, deleteEmpreendimento, updateClient } from "@/lib/store";
+import { getSurveyTypeMeta, useDB, addProject, deleteProject, addEmpreendimento, deleteEmpreendimento, updateClient } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Trash2, ArrowLeft, FolderKanban, Building2, Pencil } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, FolderKanban, Building2, Pencil, ClipboardList, FileText } from "lucide-react";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ClienteForm, emptyClienteForm, type ClienteFormValue } from "@/components/ClienteForm";
+import { getSurveyProject, getSurveysForClient } from "@/lib/surveyRelations";
 
 export const Route = createFileRoute("/clientes/$id")({
   component: ClienteDetail,
@@ -23,6 +24,7 @@ function ClienteDetail() {
   const client = db.clients.find((c) => c.id === id);
   const empreendimentos = db.empreendimentos.filter((e) => e.clientId === id);
   const projects = db.projects.filter((p) => p.clientId === id);
+  const surveys = getSurveysForClient(db.surveys, id, db.projects);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", empreendimentoId: "" });
   const [empOpen, setEmpOpen] = useState(false);
@@ -101,6 +103,61 @@ function ClienteDetail() {
           )}
         </CardContent>
       </Card>
+
+      <div className="mb-6">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Levantamentos do cliente</h2>
+            <p className="text-xs text-muted-foreground">Histórico técnico e gerencial, independente de projeto.</p>
+          </div>
+          <Link to="/levantamentos/novo" search={{ clientId: id }}>
+            <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo levantamento</Button>
+          </Link>
+        </div>
+        {surveys.length === 0 ? (
+          <Card>
+            <CardContent className="p-6 text-center text-sm text-muted-foreground">
+              Nenhum levantamento vinculado diretamente a este cliente.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-2">
+            {surveys.map((survey) => {
+              const typeMeta = getSurveyTypeMeta(survey.type, survey.customTypeId);
+              const project = getSurveyProject(survey, db.projects);
+              return (
+                <Card key={survey.id} className="hover:border-primary transition-colors">
+                  <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <Link to="/levantamentos/$id" params={{ id: survey.id }} search={{ mode: "read" }} className="flex min-w-0 flex-1 items-center gap-3">
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+                        <ClipboardList className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{survey.title}</div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {typeMeta.label}{project ? ` · ${project.name}` : " · sem projeto"}
+                        </div>
+                      </div>
+                    </Link>
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+                      <Link to="/levantamentos/$id" params={{ id: survey.id }}>
+                        <Button variant="outline" size="sm" className="w-full">
+                          <ClipboardList className="h-4 w-4 mr-1" /> Campo
+                        </Button>
+                      </Link>
+                      <Link to="/levantamentos/$id/resumo" params={{ id: survey.id }}>
+                        <Button variant="outline" size="sm" className="w-full">
+                          <FileText className="h-4 w-4 mr-1" /> Relatório
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Empreendimentos */}
       <div className="flex items-center justify-between mb-3">

@@ -490,7 +490,13 @@ export async function seedDemoData(): Promise<{ created: number; surveys: string
     const project = addProject({ clientId: client.id, name: `Projeto ${sc.empreendimento.nome}`, description: sc.resumoTecnico });
 
     // 3) Levantamento
-    const survey = addSurveyExt({ projectId: project.id, type: sc.type, title: sc.surveyTitle, customTypeId: sc.customTypeId });
+    const survey = addSurveyExt({
+      clientId: client.id,
+      projectId: project.id,
+      type: sc.type,
+      title: sc.surveyTitle,
+      customTypeId: sc.customTypeId,
+    });
     surveyIds.push(survey.id);
 
     // 4) Resolve módulos efetivos

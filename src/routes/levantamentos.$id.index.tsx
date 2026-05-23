@@ -567,7 +567,7 @@ function ModulePanel({ survey, module: m, onModuleDone }: { survey: any; module:
   const handleNote = useCallback((fieldId: string, note: string) => setFieldNote(survey.id, m.id, fieldId, note), [survey.id, m.id]);
   const handleNA = useCallback((fieldId: string, na: boolean) => setFieldNA(survey.id, m.id, fieldId, na), [survey.id, m.id]);
 
-  function renderField(f: FieldDef) {
+  function renderField(f: FieldDef, display: "active" | "review" = "active") {
     if (!shouldShowField(f, values)) return null;
     return (
       <FieldRenderer
@@ -582,6 +582,7 @@ function ModulePanel({ survey, module: m, onModuleDone }: { survey: any; module:
         onNote={(n) => handleNote(f.id, n)}
         onNA={(na) => handleNA(f.id, na)}
         moduleValues={values}
+        display={display}
       />
     );
   }
@@ -642,7 +643,7 @@ function ModulePanel({ survey, module: m, onModuleDone }: { survey: any; module:
           </div>
         )}
 
-        {m.fields.length > 0 && <div className="grid gap-2.5">{m.fields.map(renderField)}</div>}
+        {m.fields.length > 0 && <div className="grid gap-2.5">{m.fields.map((f: FieldDef) => renderField(f))}</div>}
 
         {m.id !== "fotos" && subgroups.length > 0 && (
           <div className="mt-3 grid gap-2">
@@ -669,7 +670,7 @@ function ModulePanel({ survey, module: m, onModuleDone }: { survey: any; module:
 
 function SubgroupBlock({ subgroup, renderField, state, isNA, onToggleNA, isDone, onToggleDone, forceOpen, note, onNote }: {
   subgroup: SubgroupDef;
-  renderField: (f: FieldDef) => React.ReactNode;
+  renderField: (f: FieldDef, display?: "active" | "review") => React.ReactNode;
   state: ModuleState;
   isNA: boolean;
   onToggleNA: (na: boolean) => void;
@@ -682,6 +683,8 @@ function SubgroupBlock({ subgroup, renderField, state, isNA, onToggleNA, isDone,
   const effective = computeSubgroupStatus(subgroup, state);
   const { filled, total } = subgroupProgress(subgroup, state);
   const visibleFields = subgroup.fields.filter((f) => shouldShowField(f, state.values));
+  const completedFields = visibleFields.filter((f) => (state.fieldStatus[f.id] || "nao_iniciado") === "concluido" && !(state.nonApplicable ?? {})[f.id]);
+  const naFields = visibleFields.filter((f) => !!(state.nonApplicable ?? {})[f.id]);
   const [openInternal, setOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   // Quando marca como concluído manualmente, recolhe.
@@ -730,6 +733,35 @@ function SubgroupBlock({ subgroup, renderField, state, isNA, onToggleNA, isDone,
             {filled}/{total}
           </div>
         </button>
+        {(completedFields.length > 0 || naFields.length > 0) && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="px-2 text-xs hover:bg-secondary/40 border-l border-border inline-flex items-center gap-1"
+                title="Ver campos recolhidos"
+              >
+                {completedFields.length > 0 && (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] text-white" style={{ backgroundColor: "var(--status-done)" }}>
+                    {completedFields.length}
+                  </span>
+                )}
+                {naFields.length > 0 && (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-dashed border-border px-1 text-[10px] text-muted-foreground">
+                    {naFields.length} N/A
+                  </span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-[min(22rem,calc(100vw-2rem))] p-2">
+              <div className="px-2 py-1 text-xs uppercase tracking-wider text-muted-foreground">Campos recolhidos</div>
+              <div className="grid max-h-80 gap-2 overflow-y-auto p-1">
+                {completedFields.map((f) => renderField(f, "review"))}
+                {naFields.map((f) => renderField(f, "review"))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
         {onToggleDone && (
           isDone ? (
             <button
@@ -764,7 +796,7 @@ function SubgroupBlock({ subgroup, renderField, state, isNA, onToggleNA, isDone,
       </div>
       {open && (
         <div className="border-t border-border p-3 grid gap-2.5">
-          {visibleFields.map(renderField)}
+          {visibleFields.map((f) => renderField(f))}
           {onNote && (
             <div className="pt-1">
               {!noteOpen && !note && (

@@ -6,9 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { MapPin, Ban, Pencil, Plus, Trash2, User, Phone, Mail, Briefcase, IdCard, Clock, Copy, Check, MoreHorizontal } from "lucide-react";
+import { MapPin, Ban, Pencil, Plus, Trash2, User, Phone, Mail, Briefcase, IdCard, Clock, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
-import { StatusBadge } from "./StatusBadge";
 import { GeometryManager } from "./geom/GeometryManager";
 import type { SurveyGeometry } from "@/lib/geometryTypes";
 import { outlineAccentStyle } from "@/lib/colors";
@@ -24,12 +23,8 @@ interface Props {
   onNote?: (note: string) => void;
   onNA?: (na: boolean) => void;
   moduleValues?: Record<string, any>;
+  display?: "active" | "review";
 }
-
-const STATUS_OPTIONS: FieldStatus[] = [
-  "nao_iniciado", "em_andamento", "concluido", "pendente",
-  "nao_se_aplica", "aguardando_documento", "aguardando_empresa", "requer_retorno",
-];
 
 /**
  * Input/Textarea com buffer local: o componente mantém o valor enquanto o
@@ -968,7 +963,7 @@ function HoursPresetEditor({ value, onChange }: { value: HoursValue | undefined;
   );
 }
 
-function FieldRendererComponent({ field, value, status, note, na, onChange, onStatus, onNote, onNA, moduleValues }: Props) {
+function FieldRendererComponent({ field, value, status, note, na, onChange, onStatus, onNote, onNA, moduleValues, display = "active" }: Props) {
   const [collapsed, setCollapsed] = useState(() => status === "concluido" && hasFieldValue(field, value));
   const previousStatus = useRef<FieldStatus>(status);
   const autoCompletable = isAutoCompletableField(field);
@@ -1008,6 +1003,7 @@ function FieldRendererComponent({ field, value, status, note, na, onChange, onSt
 
   // NA mode → renderiza versão compacta
   if (na) {
+    if (display === "active") return null;
     return (
       <div className="rounded-md border border-dashed border-border/70 p-2 px-3 bg-muted/30 flex items-center justify-between gap-2 min-w-0">
         <div className="text-sm min-w-0 break-words">
@@ -1025,6 +1021,7 @@ function FieldRendererComponent({ field, value, status, note, na, onChange, onSt
 
   // Resumido (concluído + colapsado)
   if (collapsed && filled && status === "concluido") {
+    if (display === "active") return null;
     return (
       <div className="rounded-md border border-border p-2 px-3 bg-card flex items-center justify-between gap-2 min-w-0">
         <div className="min-w-0">
@@ -1057,14 +1054,6 @@ function FieldRendererComponent({ field, value, status, note, na, onChange, onSt
               title={STATUS_LABELS[status]}
             />
           )}
-          <Select value={status} onValueChange={(v) => onStatus(v as FieldStatus)}>
-            <SelectTrigger className="h-7 w-auto border-0 bg-transparent p-0 hover:bg-secondary px-1.5" title="Mais opções de status">
-              <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>)}
-            </SelectContent>
-          </Select>
           {onNA && (
             <Button type="button" variant="ghost" size="sm" className="h-7 px-2" title="Marcar como não se aplica" onClick={() => onNA(true)}>
               <Ban className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1155,5 +1144,6 @@ export const FieldRenderer = memo(FieldRendererComponent, (prev, next) => {
     && prev.note === next.note
     && prev.na === next.na
     && prev.moduleValues === next.moduleValues
+    && prev.display === next.display
     && Object.is(prev.value, next.value);
 });

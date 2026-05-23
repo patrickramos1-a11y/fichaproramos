@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { QuickEditDrawer, type QuickEditTarget } from "./QuickEditDrawer";
 import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
+import { statusOutlineStyle } from "@/lib/colors";
 
 export function VisaoConsolidada({ surveyId, onOpenEditor }: { surveyId: string; onOpenEditor: (moduleId?: string) => void }) {
   const data = useDBSelector(
@@ -185,7 +186,7 @@ export function VisaoConsolidada({ surveyId, onOpenEditor }: { surveyId: string;
       </Card>
 
       {/* Encerramento */}
-      <Card style={{ borderLeft: closed ? "4px solid var(--status-done)" : "4px solid var(--status-progress)" }}>
+      <Card style={statusOutlineStyle(closed ? "done" : "progress")}>
         <CardContent className="p-5 flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm">
             {closed ? (
@@ -252,7 +253,7 @@ function ModuleConsolidatedCard({ summary, onEditModule, onEditSubgroup, onEditF
   })();
 
   return (
-    <Card style={{ borderLeft: `4px solid var(--status-${statusVar(status)})` }}>
+    <Card style={statusOutlineStyle(statusVar(status))}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="min-w-0">

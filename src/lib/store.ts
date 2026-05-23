@@ -4,7 +4,7 @@ import type {
   SurveyType, Attachment, SurveyTemplate,
   FormStructureOverrides, FieldPatch, SubgroupPatch, ModulePatch, SubgroupDef, FieldDef,
   CustomSurveyType, CustomTypeModuleBinding, ModuleRequirement,
-  PhotoChecklistAnswer,
+  PhotoChecklistAnswer, SurveyPurpose,
 } from "./types";
 import {
   getModulesForType, ensureLegacyAdapters, getEffectiveModulesForType,
@@ -14,6 +14,11 @@ import {
 } from "./modules";
 import { BUILTIN_SURVEY_TYPE_IDS, SURVEY_TYPES } from "./types";
 import { DEFAULT_BUILTIN_ICONS } from "./typeIcons";
+import {
+  OBRA_AMBIENTAL_MODULE_IDS,
+  OBRA_AMBIENTAL_REQUIRED_MODULE_IDS,
+  OBRA_AMBIENTAL_TYPE_ID,
+} from "./surveyTypeIds";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { saveSnapshot, loadSnapshot } from "./offlineSnapshot";
@@ -402,6 +407,7 @@ async function initForUser(userId: string) {
     syncGlobalOverrides();
     subscribeRealtime();
     seedBuiltInSurveyTypes();
+    seedFactoryCustomSurveyTypes();
     void saveSnapshot(userId, store.db);
   } catch (err) {
     console.error("[sync] initial load failed", err);
@@ -411,6 +417,8 @@ async function initForUser(userId: string) {
       store.db = normalizeDB(snap as any);
       store.lastSyncedDb = store.db;
       syncGlobalOverrides();
+      seedBuiltInSurveyTypes();
+      seedFactoryCustomSurveyTypes();
       store.status = { ...store.status, persistenceError: "Modo offline — usando dados locais." };
     } else {
       store.status = { ...store.status, persistenceError: "Falha ao carregar dados do servidor." };
@@ -632,6 +640,97 @@ export function addSurvey(data: { clientId: string; projectId?: string; empreend
   return addSurveyExt({ ...data });
 }
 
+function seedFactoryCustomSurveyTypes() {
+  const list = store.db.customSurveyTypes ?? [];
+  const required = new Set<string>(OBRA_AMBIENTAL_REQUIRED_MODULE_IDS);
+  const defaultPurposes: SurveyPurpose[] = ["acompanhamento", "monitoramento"];
+  const expectedBindings: CustomTypeModuleBinding[] = OBRA_AMBIENTAL_MODULE_IDS.map((moduleId) => ({
+    moduleId,
+    requirement: required.has(moduleId) ? "obrigatorio" : "opcional",
+  }));
+  const scopedOverrides: FormStructureOverrides = {
+    modules: {
+      fotos: {
+        title: "Relatorio Fotografico da Obra",
+        description: "Checklist fotografico sucinto para visitas recorrentes de obra.",
+      },
+    },
+  };
+  const factoryType: CustomSurveyType = {
+    id: OBRA_AMBIENTAL_TYPE_ID,
+    label: "Acompanhamento Ambiental de Obra",
+    description: "Ficha semanal curta para controle ambiental, operacional, documental, pendencias e evidencias fotograficas de obra.",
+    color: "oklch(0.66 0.13 150)",
+    icon: "Building2",
+    moduleBindings: expectedBindings,
+    scopedOverrides,
+    createdAt: new Date().toISOString(),
+  };
+
+  const existing = list.find((type) => type.id === OBRA_AMBIENTAL_TYPE_ID);
+  let changed = false;
+  let nextCustomSurveyTypes = list;
+
+  if (existing) {
+    const expectedIds = new Set(expectedBindings.map((binding) => binding.moduleId));
+    const existingByModule = new Map(existing.moduleBindings.map((binding) => [binding.moduleId, binding]));
+    const mergedBindings = expectedBindings.map((binding) => {
+      const current = existingByModule.get(binding.moduleId);
+      return current ? { ...binding, ...current, requirement: current.requirement ?? binding.requirement } : binding;
+    });
+    const extraBindings = existing.moduleBindings.filter((binding) => !expectedIds.has(binding.moduleId));
+    const nextType: CustomSurveyType = {
+      ...existing,
+      label: existing.label || factoryType.label,
+      description: existing.description || factoryType.description,
+      color: existing.color || factoryType.color,
+      icon: existing.icon || factoryType.icon,
+      moduleBindings: [...mergedBindings, ...extraBindings],
+      scopedOverrides: {
+        ...(existing.scopedOverrides ?? {}),
+        modules: {
+          ...(existing.scopedOverrides?.modules ?? {}),
+          ...(scopedOverrides.modules ?? {}),
+        },
+      },
+    };
+    changed = JSON.stringify(existing.moduleBindings) !== JSON.stringify(nextType.moduleBindings)
+      || JSON.stringify(existing.scopedOverrides ?? {}) !== JSON.stringify(nextType.scopedOverrides ?? {});
+    nextCustomSurveyTypes = list.map((type) => (type.id === OBRA_AMBIENTAL_TYPE_ID ? nextType : type));
+  } else {
+    changed = true;
+    nextCustomSurveyTypes = [factoryType, ...list];
+  }
+
+  const expectedModuleIds = new Set(expectedBindings.map((binding) => binding.moduleId));
+  const nextSurveys = store.db.surveys.map((survey) => {
+    if (survey.customTypeId !== OBRA_AMBIENTAL_TYPE_ID && survey.type !== OBRA_AMBIENTAL_TYPE_ID) return survey;
+    let surveyChanged = false;
+    const modules = { ...(survey.modules ?? {}) };
+    for (const moduleId of expectedModuleIds) {
+      if (!modules[moduleId]) {
+        modules[moduleId] = createModuleState();
+        surveyChanged = true;
+      }
+    }
+    const enabledModules = Array.from(new Set([...(survey.enabledModules ?? []), ...expectedModuleIds]));
+    if (enabledModules.length !== (survey.enabledModules ?? []).length) surveyChanged = true;
+    const purposes = survey.purposes?.length ? survey.purposes : defaultPurposes;
+    if (purposes !== survey.purposes) surveyChanged = true;
+    return surveyChanged ? { ...survey, modules, enabledModules, purposes } : survey;
+  });
+  if (nextSurveys.some((survey, index) => survey !== store.db.surveys[index])) changed = true;
+
+  if (!changed) return;
+
+  store.db = {
+    ...store.db,
+    customSurveyTypes: nextCustomSurveyTypes,
+    surveys: nextSurveys,
+  };
+  persist();
+}
+
 /** Versão extendida de addSurvey que aceita customTypeId. */
 export function addSurveyExt(data: {
   clientId: string;
@@ -675,6 +774,22 @@ export function addSurveyExt(data: {
       status: "em_andamento",
     };
   }
+  if (modules["obra_amb_identificacao"]) {
+    modules["obra_amb_identificacao"] = {
+      ...modules["obra_amb_identificacao"],
+      values: {
+        ...modules["obra_amb_identificacao"].values,
+        data_visita: todayISO,
+        hora_chegada: hhmm,
+      },
+      fieldStatus: {
+        ...modules["obra_amb_identificacao"].fieldStatus,
+        data_visita: "concluido",
+        hora_chegada: "concluido",
+      },
+      status: "em_andamento",
+    };
+  }
 
   const survey: Survey = {
     id: id(),
@@ -690,6 +805,10 @@ export function addSurveyExt(data: {
     createdAt: now.toISOString(),
     customTypeId: data.customTypeId,
   };
+
+  if (data.customTypeId === OBRA_AMBIENTAL_TYPE_ID || data.type === OBRA_AMBIENTAL_TYPE_ID) {
+    survey.purposes = ["acompanhamento", "monitoramento"];
+  }
 
   // Para tipos personalizados, define enabledModules a partir dos vínculos.
   if (data.customTypeId) {

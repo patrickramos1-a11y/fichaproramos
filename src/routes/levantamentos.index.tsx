@@ -13,6 +13,7 @@ import {
 import { ALL_SURVEY_PURPOSES, SURVEY_PURPOSE_LABELS, type SurveyPurpose } from "@/lib/types";
 import { PurposeChips } from "@/components/FinalidadeCard";
 import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
+import { statusOutlineStyle } from "@/lib/colors";
 
 export const Route = createFileRoute("/levantamentos/")({
   head: () => ({ meta: [{ title: "Levantamentos — Ramos Engenharia" }] }),
@@ -163,7 +164,7 @@ function Row({ s, projectIndex, clientIndex, sel, onSel, compact }: { s: any; pr
   const total = Object.keys(s.modules).length || 1;
   const done = Object.values(s.modules).filter((m: any) => m.status === "concluido").length;
   return (
-    <Card className={`hover:border-primary transition-colors ${compact ? "" : "border-l-4"}`} style={!compact ? { borderLeftColor: "var(--status-progress)" } : undefined}>
+    <Card className="hover:border-primary transition-colors" style={!compact ? statusOutlineStyle("progress") : undefined}>
       <CardContent className={`flex items-center gap-3 ${compact ? "p-2.5" : "p-3"}`}>
         <Checkbox checked={sel} onCheckedChange={onSel} aria-label="Selecionar" />
         <Link to="/levantamentos/$id" params={{ id: s.id }} search={{ mode: "edit" }} className="flex-1 flex items-center gap-3 min-w-0">

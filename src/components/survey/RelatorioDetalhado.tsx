@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
+import { statusOutlineStyle } from "@/lib/colors";
 
 export function RelatorioDetalhado({ surveyId, onOpenEditor }: { surveyId: string; onOpenEditor: (moduleId?: string) => void }) {
   const data = useDBSelector(
@@ -99,9 +100,11 @@ export function RelatorioDetalhado({ surveyId, onOpenEditor }: { surveyId: strin
         <p className="text-sm leading-relaxed whitespace-pre-line">{report.executiveSummary}</p>
       </Section>
 
-      <Section title="Finalidades do levantamento">
-        <p className="text-sm leading-relaxed">{report.purposeSection}</p>
-      </Section>
+      {report.purposeSection && (
+        <Section title="Finalidades do levantamento">
+          <p className="text-sm leading-relaxed">{report.purposeSection}</p>
+        </Section>
+      )}
 
       {report.clientSection && (
         <Section title="Dados do cliente">
@@ -122,7 +125,9 @@ export function RelatorioDetalhado({ surveyId, onOpenEditor }: { surveyId: strin
       )}
 
       {/* Desenvolvimento por módulo */}
-      <h3 className="text-sm uppercase tracking-wider text-muted-foreground pt-2">Desenvolvimento por módulo</h3>
+      <h3 className="text-sm uppercase tracking-wider text-muted-foreground pt-2">
+        {report.profile === "obra_ambiental" ? "Relatório semanal por tópico" : "Desenvolvimento por módulo"}
+      </h3>
       {report.modules.map((m) => (
         <ModuleSection
           key={m.id}
@@ -251,7 +256,7 @@ function ModuleSection({ module: m, surveyId, onEditModule, onEditSubgroup, onFi
 }) {
   const tone = m.status === "Concluído" ? "done" : (m.status === "Em andamento" ? "progress" : (m.status === "Não se aplica" ? "na" : (m.status === "Não iniciado" ? "todo" : "pending")));
   return (
-    <Card style={{ borderLeft: `4px solid var(--status-${tone})` }}>
+    <Card style={statusOutlineStyle(tone)}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="min-w-0">

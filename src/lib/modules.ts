@@ -6,6 +6,42 @@ import type {
 import { PHOTO_CHECKLISTS, ALL_TEMPLATE_KEYS } from "./photoChecklists";
 
 const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+const SIM_NAO_PARCIAL_AVALIADO = ["Sim", "Não", "Parcialmente", "Não avaliado"];
+const SIM_NAO_PARCIAL_NA = ["Sim", "Não", "Parcialmente", "Não avaliado", "Não se aplica"];
+const SIM_NAO_NA = ["Sim", "Não", "Não avaliado", "Não se aplica"];
+const CONDICOES_CLIMATICAS_OBRA = ["Ensolarado", "Nublado", "Chuvoso", "Pós-chuva", "Solo úmido", "Não avaliado"];
+const TIPOS_VISITA_OBRA = [
+  "Visita semanal", "Vistoria pontual", "Verificação de pendência", "Registro de avanço",
+  "Reunião em obra", "Verificação de não conformidade", "Encerramento de pendências", "Outro",
+];
+const STATUS_OBRA = [
+  "Não iniciada", "Em andamento", "Paralisada", "Atrasada", "Parcialmente concluída", "Concluída",
+  "Aguardando material", "Aguardando equipe", "Aguardando definição do cliente", "Aguardando órgão público", "Outro",
+];
+const FASES_OBRA = [
+  "Mobilização", "Limpeza/preparação da área", "Terraplenagem", "Fundação", "Estrutura", "Alvenaria",
+  "Cobertura", "Instalações hidráulicas", "Instalações elétricas", "Acabamento", "Área externa", "Drenagem",
+  "Paisagismo/recuperação", "Testes/comissionamento", "Correções finais", "Outro",
+];
+const TIPOS_RESIDUOS_OBRA = [
+  "Entulho", "Solo", "Madeira", "Plástico", "Papel/papelão", "Metal", "Embalagens",
+  "Resíduos orgânicos", "Resíduos perigosos", "Resíduos contaminados", "Outros",
+];
+const TIPOS_NAO_CONFORMIDADE_OBRA = [
+  "Resíduos", "Organização", "Segurança", "Erosão/sedimentos", "Água/drenagem", "Efluentes",
+  "Poeira/ruído", "Documentação", "Intervenção ambiental", "Armazenamento inadequado", "Falta de sinalização", "Outro",
+];
+const GRAVIDADES_OBRA = ["Baixa", "Média", "Alta", "Crítica"];
+const PRIORIDADES_OBRA = ["Baixa", "Média", "Alta", "Urgente"];
+const STATUS_PENDENCIA_OBRA = ["Aberta", "Em andamento", "Aguardando cliente", "Aguardando equipe", "Aguardando material", "Corrigida", "Cancelada"];
+const SITUACOES_FINAIS_OBRA = [
+  "Visita concluída sem pendências", "Visita concluída com pendências", "Visita parcial", "Necessário retorno",
+  "Aguardando informações", "Aguardando cliente", "Aguardando equipe", "Outro",
+];
+const VINCULOS_FOTO_OBRA = [
+  "Avanço da obra", "Pendência", "Não conformidade", "Correção", "Resíduos", "Drenagem/água",
+  "Organização", "Segurança", "Registro geral", "Outro",
+];
 
 export const MODULES: ModuleDef[] = [
   {
@@ -1148,11 +1184,323 @@ export const MODULES: ModuleDef[] = [
     ],
   },
   {
+    id: "obra_amb_identificacao",
+    title: "Identificação da Visita",
+    description: "Contexto básico do acompanhamento ambiental da obra.",
+    fields: [],
+    purposes: ["acompanhamento", "monitoramento"],
+    subgroups: [
+      {
+        id: "dados_visita",
+        title: "Dados da visita",
+        fields: [
+          { id: "cliente", label: "Cliente", type: "text" },
+          { id: "obra_empreendimento", label: "Obra / empreendimento", type: "text" },
+          { id: "local_obra", label: "Local da obra", type: "text" },
+          { id: "data_visita", label: "Data da visita", type: "date" },
+          { id: "hora_chegada", label: "Horário de chegada", type: "time" },
+          { id: "hora_saida", label: "Horário de saída", type: "time" },
+          { id: "responsavel_acompanhamento", label: "Responsável pelo acompanhamento", type: "text" },
+          { id: "pessoa_vistoria", label: "Pessoa que realizou a vistoria", type: "text" },
+          { id: "pessoa_local", label: "Pessoa que acompanhou no local", type: "text" },
+          { id: "cargo_pessoa_local", label: "Cargo/função da pessoa que acompanhou", type: "text" },
+          { id: "condicao_climatica", label: "Condição climática no momento da visita", type: "button-select", options: CONDICOES_CLIMATICAS_OBRA },
+        ],
+      },
+      {
+        id: "tipo_acompanhamento",
+        title: "Tipo de acompanhamento",
+        fields: [
+          { id: "tipo_visita", label: "Tipo de visita", type: "button-select", options: TIPOS_VISITA_OBRA, allowOther: true },
+          { id: "objetivo_visita", label: "Objetivo da visita", type: "textarea" },
+          { id: "visita_recorrente", label: "Visita recorrente?", type: "button-select", options: ["Sim", "Não", "Não avaliado"] },
+          { id: "semana_referencia", label: "Semana/referência do acompanhamento", type: "text" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "obra_amb_situacao",
+    title: "Situação Geral da Obra",
+    description: "Status geral, fase e avanço percebido desde a visita anterior.",
+    fields: [],
+    purposes: ["acompanhamento", "monitoramento"],
+    subgroups: [
+      {
+        id: "status_obra",
+        title: "Status da obra",
+        fields: [
+          { id: "status_geral_obra", label: "Status geral da obra", type: "button-select", options: STATUS_OBRA, allowOther: true },
+          { id: "fase_atual_obra", label: "Fase atual da obra", type: "button-select", options: FASES_OBRA, allowOther: true },
+          { id: "houve_avanco", label: "Houve avanço desde a última visita?", type: "button-select", options: ["Sim", "Não", "Parcialmente", "Não aplicável", "Não avaliado"] },
+          { id: "obra_dentro_previsto", label: "A obra está dentro do previsto?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+          { id: "percentual_avanco", label: "Percentual aproximado de avanço", type: "number", unit: "%" },
+          { id: "resumo_semana", label: "Resumo rápido da semana", type: "textarea" },
+          { id: "mudancas_visita_anterior", label: "O que mudou desde a última visita?", type: "textarea" },
+          { id: "pendencias_anteriores_resolvidas", label: "Pendências anteriores resolvidas?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+        ],
+      },
+    ],
+  },
+  {
+    id: "obra_amb_controle",
+    title: "Controle Ambiental da Obra",
+    description: "Verificação objetiva dos principais controles ambientais no canteiro.",
+    fields: [],
+    purposes: ["acompanhamento", "monitoramento", "projeto"],
+    subgroups: [
+      {
+        id: "condicoes_ambientais",
+        title: "Condições ambientais gerais",
+        fields: [
+          { id: "controle_ambiental_visivel", label: "Há controle ambiental visível na obra?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "area_delimitada", label: "A área da obra está delimitada?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "interferencia_vegetacao", label: "Há interferência em vegetação?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "supressao_poda_recente", label: "Há supressão ou poda recente?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "sinais_erosao", label: "Há sinais de erosão?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "carreamento_sedimentos", label: "Há carreamento de solo/sedimentos?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "material_inadequado", label: "Há acúmulo de material em local inadequado?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "intervencao_area_sensivel", label: "Há intervenção em APP, curso d’água, drenagem ou área sensível?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "contaminacao_solo", label: "Há evidência de contaminação do solo?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "poeira_significativa", label: "Há emissão de poeira significativa?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "ruido_relevante", label: "Há geração de ruído relevante?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "odor_emissao", label: "Há odor ou emissão perceptível?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+        ],
+      },
+      {
+        id: "observacao_ambiental",
+        title: "Observação ambiental",
+        optional: true,
+        fields: [
+          { id: "observacao_ambiental", label: "Observação ambiental da visita", type: "textarea" },
+          { id: "pontos_ambientais_atencao", label: "Pontos ambientais de atenção", type: "textarea" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "obra_amb_boas_praticas",
+    title: "Organização, Segurança e Boas Práticas",
+    description: "Organização do canteiro, sinalização, segurança aparente e orientações em campo.",
+    fields: [],
+    purposes: ["acompanhamento", "monitoramento"],
+    subgroups: [
+      {
+        id: "organizacao_obra",
+        title: "Organização da obra",
+        fields: [
+          { id: "obra_organizada", label: "A obra está organizada?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+          { id: "materiais_armazenados", label: "Os materiais estão armazenados adequadamente?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+          { id: "acessos_livres", label: "Os acessos estão livres?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+          { id: "sinalizacao_basica", label: "Há sinalização básica?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+          { id: "area_materiais", label: "Há área definida para armazenamento de materiais?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+          { id: "area_residuos", label: "Há área definida para resíduos?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+          { id: "limpeza_geral", label: "Há limpeza geral adequada?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+          { id: "risco_aparente", label: "Há risco aparente no local?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+        ],
+      },
+      {
+        id: "seguranca_conduta",
+        title: "Segurança e conduta",
+        fields: [
+          { id: "equipe_epi", label: "A equipe estava utilizando EPI?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+          { id: "equipe_trabalhando", label: "Havia equipe trabalhando no momento da visita?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+          { id: "responsavel_presente", label: "Havia responsável da obra presente?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+          { id: "condicao_insegura", label: "Há condição insegura aparente?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+          { id: "orientacao_repassada", label: "Alguma orientação foi repassada em campo?", type: "button-select", options: SIM_NAO_PARCIAL_AVALIADO },
+          { id: "obs_boas_praticas", label: "Observações sobre segurança, organização e boas práticas", type: "textarea" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "obra_amb_residuos",
+    title: "Resíduos da Obra",
+    description: "Geração, segregação, acondicionamento e destinação básica de resíduos.",
+    fields: [],
+    purposes: ["acompanhamento", "monitoramento"],
+    subgroups: [
+      {
+        id: "gestao_residuos",
+        title: "Gestão de resíduos",
+        fields: [
+          { id: "residuos_gerados", label: "Há resíduos gerados na obra?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "residuos_segregados", label: "Os resíduos estão segregados?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "residuos_acondicionados", label: "Os resíduos estão acondicionados adequadamente?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "recipiente_residuos", label: "Há recipiente, caçamba ou local definido para resíduos?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "mistura_residuos", label: "Há mistura de resíduos?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "residuos_espalhados", label: "Há resíduos espalhados no canteiro?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "residuos_perigosos", label: "Há resíduos perigosos ou contaminados?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "retirada_coleta", label: "Houve retirada/coleta desde a última visita?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "comprovante_destinacao", label: "Há comprovante ou registro de destinação?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+        ],
+      },
+      {
+        id: "tipos_residuos",
+        title: "Tipos de resíduos observados",
+        fields: [
+          { id: "tipos_residuos_observados", label: "Tipos de resíduos observados", type: "button-select", multi: true, options: TIPOS_RESIDUOS_OBRA, allowOther: true },
+          { id: "destinacao_observada", label: "Destinação observada", type: "text" },
+          { id: "responsavel_coleta", label: "Responsável pela coleta/destinação", type: "text" },
+          { id: "obs_residuos", label: "Observações sobre resíduos", type: "textarea" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "obra_amb_agua_drenagem",
+    title: "Efluentes, Água e Drenagem",
+    description: "Água, drenagem, efluentes e possíveis impactos associados.",
+    fields: [],
+    purposes: ["acompanhamento", "monitoramento"],
+    subgroups: [
+      {
+        id: "agua_drenagem",
+        title: "Água e drenagem",
+        fields: [
+          { id: "acumulo_agua", label: "Há acúmulo de água na obra?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "drenagem_provisoria", label: "Há drenagem provisória?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "erosao_escoamento", label: "Há sinais de erosão por escoamento?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "lancamento_irregular", label: "Há lançamento irregular de água ou efluente?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "lama_via_publica", label: "Há lama ou carreamento para via pública?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "protecao_drenagem", label: "Há proteção de bocas de lobo ou drenagem?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "uso_agua_obra", label: "Há uso de água na obra?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "origem_agua_identificada", label: "A água utilizada possui origem identificada?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+        ],
+      },
+      {
+        id: "efluentes_sanitarios",
+        title: "Efluentes e sanitários",
+        fields: [
+          { id: "banheiro_quimico", label: "Há banheiro químico ou estrutura sanitária?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "destinacao_efluentes", label: "Há destinação adequada de efluentes sanitários?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "vazamento_aparente", label: "Há vazamento aparente?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "odor_extravasamento", label: "Há odor ou extravasamento?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "registro_coleta_manutencao", label: "Há registro de coleta/manutenção?", type: "button-select", options: SIM_NAO_PARCIAL_NA },
+          { id: "obs_agua_drenagem", label: "Observações sobre água, efluentes e drenagem", type: "textarea" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "obra_amb_nao_conformidades",
+    title: "Não Conformidades e Pendências",
+    description: "Registro do que está errado, o que precisa ser corrigido e quem deve agir.",
+    fields: [],
+    purposes: ["acompanhamento", "monitoramento"],
+    subgroups: [
+      {
+        id: "nao_conformidades",
+        title: "Não conformidades",
+        fields: [
+          { id: "foram_identificadas_nc", label: "Foram identificadas não conformidades?", type: "button-select", options: SIM_NAO_NA },
+          {
+            id: "nao_conformidades_itens",
+            label: "Não conformidades registradas",
+            type: "repeater",
+            addItemLabel: "Adicionar não conformidade",
+            itemFields: [
+              { id: "tipo", label: "Tipo de não conformidade", type: "button-select", options: TIPOS_NAO_CONFORMIDADE_OBRA, allowOther: true },
+              { id: "descricao", label: "Descrição da não conformidade", type: "textarea" },
+              { id: "gravidade", label: "Gravidade", type: "button-select", options: GRAVIDADES_OBRA },
+              { id: "acao_imediata", label: "Requer ação imediata?", type: "button-select", options: ["Sim", "Não", "Não avaliado"] },
+              { id: "foto_vinculada", label: "Foto vinculada?", type: "button-select", options: ["Sim", "Não"] },
+              { id: "responsavel", label: "Responsável pela correção", type: "text" },
+              { id: "prazo", label: "Prazo para correção", type: "date" },
+              { id: "status", label: "Status da não conformidade", type: "button-select", options: STATUS_PENDENCIA_OBRA },
+            ],
+          },
+        ],
+      },
+      {
+        id: "pendencias",
+        title: "Pendências",
+        fields: [
+          { id: "ha_pendencias", label: "Há pendências da visita?", type: "button-select", options: SIM_NAO_NA },
+          {
+            id: "pendencias_itens",
+            label: "Pendências da visita",
+            type: "repeater",
+            addItemLabel: "Adicionar pendência",
+            itemFields: [
+              { id: "descricao", label: "Descrição da pendência", type: "textarea" },
+              { id: "responsavel", label: "Responsável", type: "text" },
+              { id: "prazo", label: "Prazo", type: "date" },
+              { id: "prioridade", label: "Prioridade", type: "button-select", options: PRIORIDADES_OBRA },
+              { id: "status", label: "Status da pendência", type: "button-select", options: STATUS_PENDENCIA_OBRA },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "obra_amb_encaminhamentos",
+    title: "Encaminhamentos e Próxima Visita",
+    description: "Ações após a visita, comunicações e pontos para retorno.",
+    fields: [],
+    purposes: ["acompanhamento", "monitoramento"],
+    subgroups: [
+      {
+        id: "encaminhamentos",
+        title: "Encaminhamentos",
+        fields: [
+          { id: "encaminhamentos_definidos", label: "Encaminhamentos definidos", type: "textarea" },
+          { id: "quem_comunicar", label: "Quem deve ser comunicado?", type: "text" },
+          { id: "retorno_antes_proxima", label: "Há necessidade de retorno antes da próxima visita?", type: "button-select", options: SIM_NAO_NA },
+          { id: "enviar_relatorio_cliente", label: "Deve ser enviado relatório ao cliente?", type: "button-select", options: SIM_NAO_NA },
+          { id: "cobrar_correcao", label: "Deve ser cobrada correção?", type: "button-select", options: SIM_NAO_NA },
+          { id: "solicitar_documento", label: "Deve ser solicitado documento?", type: "button-select", options: SIM_NAO_NA },
+          { id: "nova_vistoria_especifica", label: "Deve ser realizada nova vistoria específica?", type: "button-select", options: SIM_NAO_NA },
+        ],
+      },
+      {
+        id: "proxima_visita",
+        title: "Próxima visita",
+        fields: [
+          { id: "proxima_visita_prevista", label: "Próxima visita prevista", type: "date" },
+          { id: "pontos_verificar_proxima", label: "Pontos a verificar na próxima visita", type: "textarea" },
+          { id: "pendencias_revisar_proxima", label: "Pendências que devem ser revisadas na próxima visita", type: "textarea" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "obra_amb_encerramento",
+    title: "Encerramento",
+    description: "Fechamento da visita e liberação do relatório semanal.",
+    fields: [],
+    purposes: ["acompanhamento", "monitoramento"],
+    subgroups: [
+      {
+        id: "fechamento",
+        title: "Fechamento",
+        fields: [
+          { id: "situacao_final", label: "Situação final da visita", type: "button-select", options: SITUACOES_FINAIS_OBRA, allowOther: true },
+          { id: "pode_concluir", label: "Levantamento pode ser concluído?", type: "button-select", options: ["Sim", "Não", "Parcialmente"] },
+          { id: "concluida_com_pendencias", label: "Visita concluída com pendências?", type: "button-select", options: ["Sim", "Não"] },
+          { id: "concluida_sem_pendencias", label: "Visita concluída sem pendências?", type: "button-select", options: ["Sim", "Não"] },
+          { id: "necessario_retorno", label: "Necessário retorno?", type: "button-select", options: ["Sim", "Não"] },
+          { id: "data_encerramento", label: "Data de encerramento", type: "date" },
+          { id: "responsavel_encerramento", label: "Responsável pelo encerramento", type: "text" },
+          { id: "observacao_encerramento", label: "Observação de encerramento", type: "textarea" },
+          { id: "assinatura_responsavel", label: "Assinatura do responsável, se necessário", type: "signature" },
+        ],
+      },
+    ],
+  },
+  {
     id: "fotos",
     title: "Relatório Fotográfico",
     description: "Marque Sim ou Não para cada tipo de foto. Os anexos são feitos na etapa de conclusão.",
     fields: [
       { id: "descricao_fotos", label: "Observações gerais sobre as fotos", type: "textarea" },
+      { id: "legenda_foto", label: "Legenda das fotos", type: "textarea" },
+      { id: "foto_vinculo", label: "Foto vinculada a qual item?", type: "button-select", options: VINCULOS_FOTO_OBRA, allowOther: true },
+      { id: "foto_comprova_avanco", label: "Foto comprova avanço?", type: "button-select", options: ["Sim", "Não", "Não avaliado"] },
+      { id: "foto_comprova_pendencia", label: "Foto comprova pendência?", type: "button-select", options: ["Sim", "Não", "Não avaliado"] },
+      { id: "foto_comprova_nao_conformidade", label: "Foto comprova não conformidade?", type: "button-select", options: ["Sim", "Não", "Não avaliado"] },
+      { id: "foto_comprova_correcao", label: "Foto comprova correção?", type: "button-select", options: ["Sim", "Não", "Não avaliado"] },
     ],
   },
   {

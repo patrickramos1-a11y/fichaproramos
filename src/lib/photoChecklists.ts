@@ -1,4 +1,5 @@
 import type { SurveyType } from "./types";
+import { OBRA_AMBIENTAL_TYPE_ID } from "./surveyTypeIds";
 
 export type PhotoChecklistKey =
   | "projeto"
@@ -197,6 +198,7 @@ export const PHOTO_CHECKLISTS: Record<PhotoChecklistKey, PhotoChecklistTemplate>
 export const DEFAULT_TEMPLATES_BY_SURVEY_TYPE: Record<string, PhotoChecklistKey[]> = {
   geral: ["projeto"],
   ambiental: ["acompanhamento"],
+  [OBRA_AMBIENTAL_TYPE_ID]: ["obras"],
   outorga: ["outorga"],
   vazao: ["vazao"],
   terreno: ["visita_terreno"],

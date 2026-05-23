@@ -5,6 +5,7 @@ import type {
 import { SURVEY_PURPOSE_LABELS, STATUS_LABELS } from "./types";
 import { computeModuleStatus, computeSubgroupStatus, shouldShowField, subgroupProgress } from "./modules";
 import { summarizeModule } from "./surveyNarrative";
+import { OBRA_AMBIENTAL_TYPE_ID } from "./surveyTypeIds";
 
 /** Linha de tabela do relatório. */
 export interface ReportRow {
@@ -46,6 +47,7 @@ export interface ReportModule {
 }
 
 export interface SurveyReport {
+  profile?: "obra_ambiental";
   /** Cabeçalho. */
   header: {
     title: string;
@@ -115,13 +117,25 @@ function isFilled(v: unknown): boolean {
   return true;
 }
 
+function isReportableValue(v: unknown): boolean {
+  if (!isFilled(v)) return false;
+  if (typeof v === "string") {
+    const normalized = v.trim().toLowerCase();
+    return !["n/a", "não se aplica", "nao se aplica", "não aplicável", "nao aplicavel", "não avaliado", "nao avaliado"].includes(normalized);
+  }
+  if (Array.isArray(v)) return v.some((item) => isReportableValue(item));
+  return true;
+}
+
 export function formatFieldValue(field: FieldDef, value: unknown): string {
   if (!isFilled(value)) return "";
   switch (field.type) {
     case "boolean": return value ? "Sim" : "Não";
     case "date": return fmtDate(String(value));
+    case "button-select":
+    case "select":
     case "multiselect":
-      return Array.isArray(value) ? (value as string[]).join(", ") : String(value);
+      return Array.isArray(value) ? (value as string[]).filter(isReportableValue).join(", ") : String(value);
     case "number":
     case "quantity": {
       const num = typeof value === "object" ? (value as any).value : value;
@@ -183,7 +197,7 @@ export function formatFieldValue(field: FieldDef, value: unknown): string {
 
 function buildRow(field: FieldDef, state: ModuleState): ReportRow {
   const raw = state.values?.[field.id];
-  const filled = isFilled(raw);
+  const filled = isReportableValue(raw);
   const fs = state.fieldStatus?.[field.id];
   const value = filled ? formatFieldValue(field, raw) : "";
   const row: ReportRow = {
@@ -199,19 +213,25 @@ function buildRow(field: FieldDef, state: ModuleState): ReportRow {
     row.subRows = raw.map((item: any, idx: number) => {
       const titleField = field.itemFields![0];
       const head = item?.[titleField.id] ? String(item[titleField.id]) : `Item ${idx + 1}`;
-      const rows: ReportRow[] = field.itemFields!.map((sub) => ({
-        fieldId: `${field.id}.${idx}.${sub.id}`,
-        label: sub.label,
-        value: isFilled(item?.[sub.id]) ? formatFieldValue(sub, item[sub.id]) : "",
-        filled: isFilled(item?.[sub.id]),
-      }));
+      const rows: ReportRow[] = field.itemFields!
+        .map((sub) => ({
+          fieldId: `${field.id}.${idx}.${sub.id}`,
+          label: sub.label,
+          value: isReportableValue(item?.[sub.id]) ? formatFieldValue(sub, item[sub.id]) : "",
+          filled: isReportableValue(item?.[sub.id]),
+        }))
+        .filter((subRow) => subRow.filled);
       return { title: head, rows };
-    });
+    }).filter((sub) => sub.rows.length > 0);
   }
   return row;
 }
 
 function moduleParagraph(m: ModuleDef, state: ModuleState, filled: number, total: number): string {
+  if (m.id.startsWith("obra_amb_") || m.id === "fotos") {
+    if (filled === 0) return `${m.title}: sem registros preenchidos para esta visita.`;
+    return `${m.title}: ${filled}/${total} item(ns) preenchido(s) nesta visita.`;
+  }
   if (state?.naModule) return `O módulo "${m.title}" foi marcado como não aplicável a este levantamento.`;
   if (total === 0) return `O módulo "${m.title}" não possui campos exigíveis no escopo deste levantamento.`;
   const pct = Math.round((filled / total) * 100);
@@ -231,6 +251,28 @@ function moduleParagraph(m: ModuleDef, state: ModuleState, filled: number, total
   return `O módulo "${m.title}" está ${pct}% preenchido (${filled}/${total} campos).${tail}`;
 }
 
+function buildObraAmbientalSummary(
+  survey: Survey,
+  client: Client | null,
+  photos: number,
+  openPendencias: number,
+): string {
+  const ident = (survey.modules?.obra_amb_identificacao?.values ?? {}) as Record<string, any>;
+  const situacao = (survey.modules?.obra_amb_situacao?.values ?? {}) as Record<string, any>;
+  const nc = (survey.modules?.obra_amb_nao_conformidades?.values ?? {}) as Record<string, any>;
+  const data = fmtDate(ident.data_visita ?? survey.date);
+  const obra = ident.obra_empreendimento || ident.local_obra || client?.name || "obra acompanhada";
+  const status = situacao.status_geral_obra || "status não informado";
+  const fase = situacao.fase_atual_obra || "fase não informada";
+  const avanco = situacao.houve_avanco || "não avaliado";
+  const ncItems = Array.isArray(nc.nao_conformidades_itens) ? nc.nao_conformidades_itens : [];
+  const pendItems = Array.isArray(nc.pendencias_itens) ? nc.pendencias_itens : [];
+  const temas = Array.from(new Set(ncItems.map((item: any) => item?.tipo).filter(Boolean))).slice(0, 4);
+  const temasText = temas.length ? temas.join(", ") : "sem tema crítico registrado";
+
+  return `A visita de acompanhamento ambiental da obra foi realizada${data ? ` em ${data}` : ""}, no empreendimento ${obra}, com objetivo de verificar a situação geral da obra, condições ambientais do canteiro, organização, resíduos, drenagem, pendências e registros fotográficos. No momento da visita, a obra encontrava-se ${status}, na fase de ${fase}. O avanço em relação à visita anterior foi registrado como ${avanco}. Foram registradas ${pendItems.length + openPendencias} pendência(s), ${ncItems.length} não conformidade(s) e ${photos} foto(s), relacionadas principalmente a ${temasText}.`;
+}
+
 function statusLabelOf(status: string | undefined): string {
   if (!status) return STATUS_LABELS.nao_iniciado;
   return (STATUS_LABELS as any)[status] ?? status;
@@ -246,6 +288,7 @@ export function buildReport(
   projectName?: string,
 ): SurveyReport {
   const purposeLabels = (survey.purposes ?? []).map((p) => SURVEY_PURPOSE_LABELS[p as SurveyPurpose]).filter(Boolean);
+  const isObraAmbiental = survey.type === OBRA_AMBIENTAL_TYPE_ID || survey.customTypeId === OBRA_AMBIENTAL_TYPE_ID;
   const moduleReports: ReportModule[] = [];
   let totalFields = 0;
   let filledFields = 0;
@@ -356,7 +399,7 @@ export function buildReport(
 
   const purposeSection = purposeLabels.length
     ? `Este levantamento foi classificado para as finalidades ${purposeLabels.join(", ")}. As informações coletadas podem subsidiar diretamente as entregas técnicas associadas a cada uma dessas finalidades.`
-    : `Nenhuma finalidade técnica foi associada a este levantamento. Recomenda-se classificar a finalidade antes do encerramento.`;
+    : (isObraAmbiental ? "" : `Nenhuma finalidade técnica foi associada a este levantamento. Recomenda-se classificar a finalidade antes do encerramento.`);
 
   // Seção do cliente
   let clientSection: SurveyReport["clientSection"] | undefined;
@@ -380,19 +423,38 @@ export function buildReport(
   }
 
   // Visita
-  const ident = (survey.modules?.identificacao?.values ?? {}) as any;
-  const visitRows: ReportRow[] = [
-    ["Data da visita", fmtDate(ident.data_visita ?? survey.date)],
-    ["Horário de chegada", ident.hora_chegada ?? ""],
-    ["Objetivo", ident.objetivo ?? ""],
-    ["Motivo", Array.isArray(ident.motivo) ? ident.motivo.join(", ") : (ident.motivo ?? "")],
-    ["Responsável técnico", survey.responsavel ?? ""],
-    ["Realizado por", survey.realizadoPor ?? ""],
-    ["Status", closed ? `Encerrado em ${fmtDateTime(survey.closedAt)}` : "Em andamento"],
-  ].map(([label, value]) => ({
+  const ident = (survey.modules?.[isObraAmbiental ? "obra_amb_identificacao" : "identificacao"]?.values ?? {}) as any;
+  const visitSourceRows = isObraAmbiental
+    ? [
+      ["Data da visita", fmtDate(ident.data_visita ?? survey.date)],
+      ["Horário de chegada", ident.hora_chegada ?? ""],
+      ["Horário de saída", ident.hora_saida ?? ""],
+      ["Obra / empreendimento", ident.obra_empreendimento ?? ""],
+      ["Local da obra", ident.local_obra ?? ""],
+      ["Tipo de visita", ident.tipo_visita ?? ""],
+      ["Semana/referência", ident.semana_referencia ?? ""],
+      ["Condição climática", ident.condicao_climatica ?? ""],
+      ["Objetivo", ident.objetivo_visita ?? ""],
+      ["Responsável", ident.responsavel_acompanhamento ?? survey.responsavel ?? ""],
+      ["Realizado por", ident.pessoa_vistoria ?? survey.realizadoPor ?? ""],
+      ["Acompanhou no local", [ident.pessoa_local, ident.cargo_pessoa_local].filter(Boolean).join(" - ")],
+      ["Status", closed ? `Encerrado em ${fmtDateTime(survey.closedAt)}` : "Em andamento"],
+    ]
+    : [
+      ["Data da visita", fmtDate(ident.data_visita ?? survey.date)],
+      ["Horário de chegada", ident.hora_chegada ?? ""],
+      ["Objetivo", ident.objetivo ?? ""],
+      ["Motivo", Array.isArray(ident.motivo) ? ident.motivo.join(", ") : (ident.motivo ?? "")],
+      ["Responsável técnico", survey.responsavel ?? ""],
+      ["Realizado por", survey.realizadoPor ?? ""],
+      ["Status", closed ? `Encerrado em ${fmtDateTime(survey.closedAt)}` : "Em andamento"],
+    ];
+  const visitRows: ReportRow[] = visitSourceRows.map(([label, value]) => ({
     fieldId: `visit.${label}`, label: String(label), value: String(value ?? ""), filled: !!value,
   })).filter((r) => r.filled);
-  const visitParagraph = `A visita foi ${closed ? "encerrada" : "registrada"} ${ident.data_visita || survey.date ? `em ${fmtDate(ident.data_visita ?? survey.date)}` : ""}${survey.responsavel ? `, sob responsabilidade de ${survey.responsavel}` : ""}${survey.realizadoPor ? ` e executada em campo por ${survey.realizadoPor}` : ""}.`;
+  const visitParagraph = isObraAmbiental
+    ? `A visita de acompanhamento ambiental foi ${closed ? "encerrada" : "registrada"}${ident.data_visita || survey.date ? ` em ${fmtDate(ident.data_visita ?? survey.date)}` : ""}${ident.obra_empreendimento ? ` na obra ${ident.obra_empreendimento}` : ""}${ident.responsavel_acompanhamento ? `, sob responsabilidade de ${ident.responsavel_acompanhamento}` : ""}.`
+    : `A visita foi ${closed ? "encerrada" : "registrada"} ${ident.data_visita || survey.date ? `em ${fmtDate(ident.data_visita ?? survey.date)}` : ""}${survey.responsavel ? `, sob responsabilidade de ${survey.responsavel}` : ""}${survey.realizadoPor ? ` e executada em campo por ${survey.realizadoPor}` : ""}.`;
 
   // Pendências
   const pendItems = survey.pendencias ?? [];
@@ -406,6 +468,7 @@ export function buildReport(
     : `Levantamento ainda em andamento.${openPendencias > 0 ? ` Há ${openPendencias} pendência(s) em aberto a serem resolvidas antes do encerramento.` : ""}`;
 
   return {
+    profile: isObraAmbiental ? "obra_ambiental" : undefined,
     header: {
       title: survey.title,
       clientName: client?.name ?? "—",
@@ -424,7 +487,9 @@ export function buildReport(
         photos, docs, audios,
       },
     },
-    executiveSummary: partsExec.join(" "),
+    executiveSummary: isObraAmbiental
+      ? buildObraAmbientalSummary(survey, client, photos, openPendencias)
+      : partsExec.join(" "),
     purposeSection,
     clientSection,
     visitSection: { paragraph: visitParagraph, rows: visitRows },

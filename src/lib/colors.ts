@@ -42,9 +42,22 @@ export function colorStyle(key: string, overrides?: Record<string, string>) {
   return { backgroundColor: c, color: "white" } as const;
 }
 
-/** Estilo de borda colorida (faixa lateral). */
+/** Contorno colorido sem faixa lateral grossa, mais adequado ao mobile. */
+export function outlineAccentStyle(color: string) {
+  return {
+    borderColor: `color-mix(in oklab, ${color} 55%, var(--border))`,
+    boxShadow: `0 0 0 1px color-mix(in oklab, ${color} 32%, transparent)`,
+  } as const;
+}
+
+/** Contorno por token de status: done, progress, pending, na, todo etc. */
+export function statusOutlineStyle(token: string) {
+  return outlineAccentStyle(`var(--status-${token})`);
+}
+
+/** Estilo de destaque colorido sem ocupar espaço interno do card. */
 export function borderStyle(key: string, overrides?: Record<string, string>) {
-  return { borderLeft: `4px solid ${resolveColor(key, overrides)}` } as const;
+  return outlineAccentStyle(resolveColor(key, overrides));
 }
 
 export const PALETTE_PRESETS = PALETTE;

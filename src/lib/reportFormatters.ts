@@ -69,8 +69,10 @@ export function toMarkdown(r: SurveyReport): string {
 
   out.push("\n## Resumo executivo\n");
   out.push(r.executiveSummary);
-  out.push("\n## Finalidades\n");
-  out.push(r.purposeSection);
+  if (r.purposeSection) {
+    out.push("\n## Finalidades\n");
+    out.push(r.purposeSection);
+  }
 
   if (r.clientSection) {
     out.push("\n## Dados do cliente\n");
@@ -85,7 +87,7 @@ export function toMarkdown(r: SurveyReport): string {
     out.push(rowsToMd(r.visitSection.rows));
   }
 
-  out.push("\n## Desenvolvimento por módulo\n");
+  out.push(r.profile === "obra_ambiental" ? "\n## Relatório semanal por tópico\n" : "\n## Desenvolvimento por módulo\n");
   for (const m of r.modules) out.push("\n" + moduleToMd(m));
 
   out.push("\n## Pendências\n");

@@ -35,6 +35,7 @@ import { ModuleConfigStep } from "@/components/ModuleConfigStep";
 import { PhotoChecklist } from "@/components/PhotoChecklist";
 import { PhotoAttachmentsPanel } from "@/components/PhotoAttachmentsPanel";
 import { type FieldStatus, type FieldDef, type SubgroupDef, type ModuleState } from "@/lib/types";
+import { statusOutlineStyle } from "@/lib/colors";
 import { FinalidadeCard } from "@/components/FinalidadeCard";
 import { VisaoConsolidada } from "@/components/survey/VisaoConsolidada";
 import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
@@ -325,7 +326,7 @@ function ConcluirLevantamentoButton({ survey, size = "lg" }: { survey: any; size
   const noPurposes = !survey.purposes || survey.purposes.length === 0;
   return (
     <>
-      <Card style={{ borderLeft: `4px solid var(--status-done)` }}>
+      <Card style={statusOutlineStyle("done")}>
         <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="text-sm font-semibold">Pronto para concluir?</div>
@@ -624,7 +625,7 @@ function ModulePanel({ survey, module: m, onModuleDone }: { survey: any; module:
   // Módulo inteiro marcado como N/A → render compacto
   if (state.naModule) {
     return (
-      <Card style={{ borderLeft: `4px solid var(--status-na)` }}>
+      <Card style={statusOutlineStyle("na")}>
         <CardContent className="p-4 flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-semibold">{m.title}</div>
@@ -637,8 +638,8 @@ function ModulePanel({ survey, module: m, onModuleDone }: { survey: any; module:
   }
 
   return (
-    <Card style={{ borderLeft: `4px solid var(--status-${statusVarSuffix(effective)})` }}>
-      <CardContent className="p-5">
+    <Card style={statusOutlineStyle(statusVarSuffix(effective))}>
+      <CardContent className="p-4 md:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
           <div>
             <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -991,7 +992,7 @@ function EncerramentoPanel({ survey }: { survey: any }) {
   return (
     <div className="space-y-4">
       {closed && (
-        <Card style={{ borderLeft: `4px solid var(--status-done)` }}>
+        <Card style={statusOutlineStyle("done")}>
           <CardContent className="p-4 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm">
               <Lock className="h-4 w-4" style={{ color: "var(--status-done)" }} />

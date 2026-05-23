@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { StatusBadge } from "./StatusBadge";
 import { GeometryManager } from "./geom/GeometryManager";
 import type { SurveyGeometry } from "@/lib/geometryTypes";
+import { outlineAccentStyle } from "@/lib/colors";
 
 interface Props {
   field: FieldDef;
@@ -599,7 +600,7 @@ function RepeaterField({ field, value, onChange }: { field: FieldDef; value: any
         }).filter(Boolean);
         return (
           <div key={it.__id ?? idx} className="rounded-md border border-border bg-card"
-            style={itemColor ? { borderLeft: `4px solid ${itemColor}` } : undefined}>
+            style={itemColor ? outlineAccentStyle(itemColor) : undefined}>
             <div className="flex items-center justify-between gap-2 p-2">
               <button type="button" onClick={() => setOpenIdx(open ? null : idx)}
                 className="flex-1 text-left min-w-0">

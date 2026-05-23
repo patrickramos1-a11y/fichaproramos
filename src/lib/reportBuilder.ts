@@ -6,6 +6,7 @@ import { SURVEY_PURPOSE_LABELS, STATUS_LABELS } from "./types";
 import { computeModuleStatus, computeSubgroupStatus, shouldShowField, subgroupProgress } from "./modules";
 import { summarizeModule } from "./surveyNarrative";
 import { OBRA_AMBIENTAL_TYPE_ID } from "./surveyTypeIds";
+import { defaultTemplateKeysFor } from "./photoChecklists";
 
 /** Linha de tabela do relatório. */
 export interface ReportRow {
@@ -289,6 +290,7 @@ export function buildReport(
 ): SurveyReport {
   const purposeLabels = (survey.purposes ?? []).map((p) => SURVEY_PURPOSE_LABELS[p as SurveyPurpose]).filter(Boolean);
   const isObraAmbiental = survey.type === OBRA_AMBIENTAL_TYPE_ID || survey.customTypeId === OBRA_AMBIENTAL_TYPE_ID;
+  const activePhotoTemplateKeys = new Set(defaultTemplateKeysFor(survey.type, survey.customTypeId));
   const moduleReports: ReportModule[] = [];
   let totalFields = 0;
   let filledFields = 0;
@@ -340,7 +342,13 @@ export function buildReport(
     }
 
     const pend = (survey.pendencias ?? []).filter((p) => p.module === m.id || p.module === m.title);
-    const atts = state.attachments ?? [];
+    const atts = m.id === "fotos"
+      ? (state.attachments ?? []).filter((att) => {
+        if (!att.photoItemId) return true;
+        const templateKey = String(att.photoItemId).split(".")[0];
+        return activePhotoTemplateKeys.has(templateKey as any);
+      })
+      : (state.attachments ?? []);
     for (const a of atts) {
       if (a.type?.startsWith("image/")) { photos++; photoList.push({ moduleId: m.id, moduleTitle: m.title, att: a }); }
       else if (a.type?.startsWith("audio/")) { audios++; audioList.push({ moduleId: m.id, moduleTitle: m.title, att: a }); }

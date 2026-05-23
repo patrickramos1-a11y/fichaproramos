@@ -1,4 +1,4 @@
-import type { SurveyType } from "./types";
+import type { FormStructureOverrides, SurveyType } from "./types";
 import { OBRA_AMBIENTAL_TYPE_ID } from "./surveyTypeIds";
 
 export type PhotoChecklistKey =
@@ -204,8 +204,45 @@ export const DEFAULT_TEMPLATES_BY_SURVEY_TYPE: Record<string, PhotoChecklistKey[
   terreno: ["visita_terreno"],
 };
 
-export function defaultTemplateKeysFor(type: SurveyType): PhotoChecklistKey[] {
+export function defaultTemplateKeysFor(type: SurveyType | string, customTypeId?: string): PhotoChecklistKey[] {
+  if (customTypeId && DEFAULT_TEMPLATES_BY_SURVEY_TYPE[customTypeId]) {
+    return DEFAULT_TEMPLATES_BY_SURVEY_TYPE[customTypeId];
+  }
   return DEFAULT_TEMPLATES_BY_SURVEY_TYPE[type] ?? ["projeto"];
+}
+
+export function defaultTemplateKeyFor(type: SurveyType | string, customTypeId?: string): PhotoChecklistKey {
+  return defaultTemplateKeysFor(type, customTypeId)[0] ?? "projeto";
+}
+
+export function photoModuleTitleForTemplate(key: PhotoChecklistKey): string {
+  switch (key) {
+    case "projeto": return "Relatorio Fotografico - Levantamento Geral de Projetos";
+    case "acompanhamento": return "Relatorio Fotografico - Acompanhamento Ambiental";
+    case "outorga": return "Relatorio Fotografico - Outorga";
+    case "vazao": return "Relatorio Fotografico - Medicao de Vazao";
+    case "visita_terreno": return "Relatorio Fotografico - Visita ao Local / Terreno";
+    case "obras": return "Relatorio Fotografico - Acompanhamento Ambiental de Obra";
+    default: return PHOTO_CHECKLISTS[key]?.title ?? "Relatorio Fotografico";
+  }
+}
+
+export function photoScopedOverridesForTemplate(key: PhotoChecklistKey): FormStructureOverrides {
+  const hiddenSubgroups = Object.fromEntries(
+    ALL_TEMPLATE_KEYS
+      .filter((templateKey) => templateKey !== key)
+      .map((templateKey) => [`fotos.tpl_${templateKey}`, { hidden: true }]),
+  );
+  return {
+    modules: {
+      fotos: {
+        title: photoModuleTitleForTemplate(key),
+        description: "Itens fotograficos definidos automaticamente para este tipo de levantamento.",
+        subgroupOrder: [`tpl_${key}`],
+      },
+    },
+    subgroups: hiddenSubgroups,
+  };
 }
 
 /** Compõe um itemId estável: "<templateKey>.<itemId local>". */

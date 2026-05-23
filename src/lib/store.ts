@@ -19,6 +19,7 @@ import {
   OBRA_AMBIENTAL_REQUIRED_MODULE_IDS,
   OBRA_AMBIENTAL_TYPE_ID,
 } from "./surveyTypeIds";
+import { defaultTemplateKeysFor, defaultTemplateKeyFor, photoScopedOverridesForTemplate } from "./photoChecklists";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { saveSnapshot, loadSnapshot } from "./offlineSnapshot";
@@ -408,6 +409,7 @@ async function initForUser(userId: string) {
     subscribeRealtime();
     seedBuiltInSurveyTypes();
     seedFactoryCustomSurveyTypes();
+    repairPhotoChecklistKeysForSurveys();
     void saveSnapshot(userId, store.db);
   } catch (err) {
     console.error("[sync] initial load failed", err);
@@ -419,6 +421,7 @@ async function initForUser(userId: string) {
       syncGlobalOverrides();
       seedBuiltInSurveyTypes();
       seedFactoryCustomSurveyTypes();
+      repairPhotoChecklistKeysForSurveys();
       store.status = { ...store.status, persistenceError: "Modo offline — usando dados locais." };
     } else {
       store.status = { ...store.status, persistenceError: "Falha ao carregar dados do servidor." };
@@ -469,8 +472,30 @@ function seedBuiltInSurveyTypes() {
     list.filter((c) => c.sourceTypeId).map((c) => [c.sourceTypeId as string, c]),
   );
   const additions: CustomSurveyType[] = [];
+  const updates: CustomSurveyType[] = [];
   for (const tid of BUILTIN_SURVEY_TYPE_IDS) {
-    if (byId.has(tid) || bySource.has(tid)) continue;
+    const existing = byId.get(tid) ?? bySource.get(tid);
+    if (existing) {
+      const photoOverrides = photoScopedOverridesForTemplate(defaultTemplateKeyFor(tid));
+      const next: CustomSurveyType = {
+        ...existing,
+        scopedOverrides: {
+          ...(existing.scopedOverrides ?? {}),
+          modules: {
+            ...(existing.scopedOverrides?.modules ?? {}),
+            ...(photoOverrides.modules ?? {}),
+          },
+          subgroups: {
+            ...(existing.scopedOverrides?.subgroups ?? {}),
+            ...(photoOverrides.subgroups ?? {}),
+          },
+        },
+      };
+      if (JSON.stringify(existing.scopedOverrides ?? {}) !== JSON.stringify(next.scopedOverrides ?? {})) {
+        updates.push(next);
+      }
+      continue;
+    }
     const meta = SURVEY_TYPES.find((t) => t.id === tid);
     const modules = getModulesForType(tid);
     const minimal = new Set((MODULE_PRESETS[tid] ?? { minimal: [] }).minimal);
@@ -484,17 +509,42 @@ function seedBuiltInSurveyTypes() {
         moduleId: m.id,
         requirement: minimal.has(m.id) ? "recomendado" : "opcional",
       })),
-      scopedOverrides: {},
+      scopedOverrides: photoScopedOverridesForTemplate(defaultTemplateKeyFor(tid)),
       createdAt: new Date().toISOString(),
     });
   }
-  if (additions.length) {
+  if (additions.length || updates.length) {
+    const updatesById = new Map(updates.map((type) => [type.id, type]));
     store.db = {
       ...store.db,
-      customSurveyTypes: [...additions, ...list],
+      customSurveyTypes: [...additions, ...list.map((type) => updatesById.get(type.id) ?? type)],
     };
     persist();
   }
+}
+
+function repairPhotoChecklistKeysForSurveys() {
+  let changed = false;
+  const surveys = store.db.surveys.map((survey) => {
+    const fotos = survey.modules?.fotos;
+    if (!fotos) return survey;
+    const expected = defaultTemplateKeysFor(survey.type, survey.customTypeId);
+    if (JSON.stringify(fotos.photoChecklistKeys ?? []) === JSON.stringify(expected)) return survey;
+    changed = true;
+    return {
+      ...survey,
+      modules: {
+        ...survey.modules,
+        fotos: {
+          ...fotos,
+          photoChecklistKeys: expected,
+        },
+      },
+    };
+  });
+  if (!changed) return;
+  store.db = { ...store.db, surveys };
+  persist();
 }
 
 function persist() {
@@ -648,14 +698,7 @@ function seedFactoryCustomSurveyTypes() {
     moduleId,
     requirement: required.has(moduleId) ? "obrigatorio" : "opcional",
   }));
-  const scopedOverrides: FormStructureOverrides = {
-    modules: {
-      fotos: {
-        title: "Relatorio Fotografico da Obra",
-        description: "Checklist fotografico sucinto para visitas recorrentes de obra.",
-      },
-    },
-  };
+  const scopedOverrides: FormStructureOverrides = photoScopedOverridesForTemplate(defaultTemplateKeyFor(OBRA_AMBIENTAL_TYPE_ID));
   const factoryType: CustomSurveyType = {
     id: OBRA_AMBIENTAL_TYPE_ID,
     label: "Acompanhamento Ambiental de Obra",
@@ -692,6 +735,10 @@ function seedFactoryCustomSurveyTypes() {
           ...(existing.scopedOverrides?.modules ?? {}),
           ...(scopedOverrides.modules ?? {}),
         },
+        subgroups: {
+          ...(existing.scopedOverrides?.subgroups ?? {}),
+          ...(scopedOverrides.subgroups ?? {}),
+        },
       },
     };
     changed = JSON.stringify(existing.moduleBindings) !== JSON.stringify(nextType.moduleBindings)
@@ -703,6 +750,7 @@ function seedFactoryCustomSurveyTypes() {
   }
 
   const expectedModuleIds = new Set(expectedBindings.map((binding) => binding.moduleId));
+  const expectedPhotoKeys = defaultTemplateKeysFor("geral", OBRA_AMBIENTAL_TYPE_ID);
   const nextSurveys = store.db.surveys.map((survey) => {
     if (survey.customTypeId !== OBRA_AMBIENTAL_TYPE_ID && survey.type !== OBRA_AMBIENTAL_TYPE_ID) return survey;
     let surveyChanged = false;
@@ -712,6 +760,10 @@ function seedFactoryCustomSurveyTypes() {
         modules[moduleId] = createModuleState();
         surveyChanged = true;
       }
+    }
+    if (modules.fotos && JSON.stringify(modules.fotos.photoChecklistKeys ?? []) !== JSON.stringify(expectedPhotoKeys)) {
+      modules.fotos = { ...modules.fotos, photoChecklistKeys: expectedPhotoKeys };
+      surveyChanged = true;
     }
     const enabledModules = Array.from(new Set([...(survey.enabledModules ?? []), ...expectedModuleIds]));
     if (enabledModules.length !== (survey.enabledModules ?? []).length) surveyChanged = true;
@@ -753,6 +805,12 @@ export function addSurveyExt(data: {
     ct?.moduleBindings.forEach((b) => moduleIds.add(b.moduleId));
   }
   moduleIds.forEach((id) => { modules[id] = createModuleState(); });
+  if (modules.fotos) {
+    modules.fotos = {
+      ...modules.fotos,
+      photoChecklistKeys: defaultTemplateKeysFor(data.type, data.customTypeId),
+    };
+  }
 
   // Pré-preenche data e horário de chegada na Identificação.
   const now = new Date();

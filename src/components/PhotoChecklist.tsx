@@ -1,13 +1,11 @@
 import { useMemo, useState } from "react";
 import {
   PHOTO_CHECKLISTS,
-  ALL_TEMPLATE_KEYS,
   defaultTemplateKeysFor,
   composeItemId,
   type PhotoChecklistKey,
 } from "@/lib/photoChecklists";
 import {
-  setPhotoChecklistKeys,
   setPhotoAnswer,
   setPhotoNote,
   setPhotoLiberadoDivulgacao,
@@ -18,7 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Check, Plus, X, MessageSquare, ChevronDown, ChevronRight,
+  Check, X, MessageSquare, ChevronDown, ChevronRight,
   Camera as CameraIcon, RotateCcw,
 } from "lucide-react";
 import type { Attachment, ModuleState, Survey } from "@/lib/types";
@@ -32,9 +30,8 @@ interface Props {
 
 export function PhotoChecklist({ survey, moduleState }: Props) {
   const activeKeys: PhotoChecklistKey[] = useMemo(() => {
-    const stored = (moduleState.photoChecklistKeys ?? []) as PhotoChecklistKey[];
-    return stored.length ? stored : defaultTemplateKeysFor(survey.type);
-  }, [moduleState.photoChecklistKeys, survey.type]);
+    return defaultTemplateKeysFor(survey.type, survey.customTypeId);
+  }, [survey.type, survey.customTypeId]);
 
   const answers = moduleState.photoChecklist ?? [];
   const answerMap = useMemo(
@@ -52,60 +49,15 @@ export function PhotoChecklist({ survey, moduleState }: Props) {
     return map;
   }, [moduleState.attachments]);
 
-  const remainingKeys = ALL_TEMPLATE_KEYS.filter((k) => !activeKeys.includes(k));
-
-  function addTemplate(key: PhotoChecklistKey) {
-    setPhotoChecklistKeys(survey.id, [...activeKeys, key]);
-  }
-  function removeTemplate(key: PhotoChecklistKey) {
-    setPhotoChecklistKeys(survey.id, activeKeys.filter((k) => k !== key));
-  }
+  const activeTitle = PHOTO_CHECKLISTS[activeKeys[0]]?.title ?? "Relatorio fotografico";
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">Modelos ativos:</span>
-        {activeKeys.map((k) => (
-          <span
-            key={k}
-            className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 text-xs"
-          >
-            {PHOTO_CHECKLISTS[k].title}
-            {activeKeys.length > 1 && (
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-destructive"
-                onClick={() => removeTemplate(k)}
-                aria-label="Remover modelo"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </span>
-        ))}
-        {remainingKeys.length > 0 && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 text-xs">
-                <Plus className="h-3 w-3 mr-1" /> Adicionar checklist
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-64 p-1 z-50">
-              <div className="grid">
-                {remainingKeys.map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    className="text-left text-sm px-2 py-1.5 rounded hover:bg-accent"
-                    onClick={() => addTemplate(k)}
-                  >
-                    {PHOTO_CHECKLISTS[k].title}
-                  </button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-        )}
+        <span className="text-xs text-muted-foreground">Checklist do tipo:</span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 text-xs">
+          {activeTitle}
+        </span>
       </div>
 
       {activeKeys.map((key) => (

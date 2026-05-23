@@ -6,6 +6,7 @@ import {
   deleteCustomSurveyType,
   duplicateCustomSurveyType,
   updateCustomSurveyType,
+  useEffectiveModulesForCustomTypeId,
 } from "@/lib/store";
 import { MODULES } from "@/lib/modules";
 import { Card, CardContent } from "@/components/ui/card";
@@ -293,8 +294,9 @@ function TypeDetail({ typeId }: { typeId: string }) {
   }
   const Icon = getTypeIcon(ct.icon);
   const color = ct.color ?? autoColor(ct.id);
+  const effectiveModules = useEffectiveModulesForCustomTypeId(ct.id);
   const linkedModules = ct.moduleBindings
-    .map((b) => MODULES.find((m) => m.id === b.moduleId))
+    .map((b) => effectiveModules.find((m) => m.id === b.moduleId) ?? MODULES.find((m) => m.id === b.moduleId))
     .filter(Boolean) as typeof MODULES;
 
   return (

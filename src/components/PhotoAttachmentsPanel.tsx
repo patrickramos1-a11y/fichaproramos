@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Camera, ImagePlus, Trash2, AlertTriangle } from "lucide-react";
 import { addAttachment, removeAttachment, setPhotoNote } from "@/lib/store";
-import { PHOTO_CHECKLISTS, type PhotoChecklistKey } from "@/lib/photoChecklists";
+import { PHOTO_CHECKLISTS, defaultTemplateKeysFor, type PhotoChecklistKey } from "@/lib/photoChecklists";
 import type { Attachment, ModuleState, Survey } from "@/lib/types";
 
 const PHOTOS_MOD = "fotos";
@@ -30,7 +30,13 @@ interface Props {
 
 export function PhotoAttachmentsPanel({ survey, readOnly }: Props) {
   const state = (survey.modules[PHOTOS_MOD] ?? { attachments: [] }) as ModuleState;
-  const answers = (state.photoChecklist ?? []).filter((a) => a.registrado === true);
+  const activeKeys = useMemo(
+    () => new Set(defaultTemplateKeysFor(survey.type, survey.customTypeId)),
+    [survey.type, survey.customTypeId],
+  );
+  const answers = (state.photoChecklist ?? []).filter(
+    (a) => a.registrado === true && activeKeys.has(a.templateKey as PhotoChecklistKey),
+  );
 
   const grouped = useMemo(() => {
     const map = new Map<string, typeof answers>();

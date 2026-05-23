@@ -1,0 +1,4 @@
+{
+  "installCommand": "bun install",
+  "buildCommand": "node node_modules/vite/bin/vite.js build"
+}

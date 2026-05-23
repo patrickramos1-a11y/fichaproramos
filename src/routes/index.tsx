@@ -46,7 +46,7 @@ function Index() {
           <h1 className="text-2xl font-semibold">Painel</h1>
           <p className="text-sm text-muted-foreground">Levantamentos de campo</p>
         </div>
-        <Link to="/levantamentos/novo" className="shrink-0">
+        <Link to="/levantamentos/novo" search={{ clientId: undefined }} className="shrink-0">
           <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo</Button>
         </Link>
       </div>
@@ -79,7 +79,7 @@ function Index() {
             {recent.map((s) => {
               const t = getSurveyTypeMeta(s.type, s.customTypeId);
               return (
-                <Link key={s.id} to="/levantamentos/$id" params={{ id: s.id }}
+                <Link key={s.id} to="/levantamentos/$id" params={{ id: s.id }} search={{ mode: "edit" }}
                   className="flex items-center justify-between rounded-md border border-border p-3 hover:bg-secondary">
                   <div>
                     <div className="font-medium text-sm">{s.title}</div>

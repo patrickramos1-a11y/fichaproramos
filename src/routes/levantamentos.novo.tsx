@@ -79,7 +79,7 @@ function NovoPage() {
       title: title || defaultTitle(),
       customTypeId: selected.id,
     });
-    nav({ to: "/levantamentos/$id", params: { id: s.id } });
+    nav({ to: "/levantamentos/$id", params: { id: s.id }, search: { mode: "edit" } });
   }
 
   return (

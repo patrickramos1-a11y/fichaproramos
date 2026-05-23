@@ -241,6 +241,7 @@ export function BuscaGlobalTab({ onOpen }: { onOpen: (moduleId: string) => void 
                   key={h.id}
                   to="/levantamentos/$id"
                   params={{ id: h.id }}
+                  search={{ mode: "edit" }}
                   className="block rounded-md border bg-card hover:border-primary/40 hover:bg-secondary/40 transition-colors px-3 py-2"
                 >
                   <div className="flex items-center gap-2 flex-wrap">

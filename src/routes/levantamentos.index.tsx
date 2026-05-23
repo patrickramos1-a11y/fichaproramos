@@ -68,7 +68,7 @@ function ListPage() {
           <h1 className="text-2xl font-semibold">Levantamentos</h1>
           <p className="text-sm text-muted-foreground">{db.surveys.length} no total</p>
         </div>
-        <Link to="/levantamentos/novo" className="shrink-0"><Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo</Button></Link>
+        <Link to="/levantamentos/novo" search={{ clientId: undefined }} className="shrink-0"><Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo</Button></Link>
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
@@ -166,7 +166,7 @@ function Row({ s, projectIndex, clientIndex, sel, onSel, compact }: { s: any; pr
     <Card className={`hover:border-primary transition-colors ${compact ? "" : "border-l-4"}`} style={!compact ? { borderLeftColor: "var(--status-progress)" } : undefined}>
       <CardContent className={`flex items-center gap-3 ${compact ? "p-2.5" : "p-3"}`}>
         <Checkbox checked={sel} onCheckedChange={onSel} aria-label="Selecionar" />
-        <Link to="/levantamentos/$id" params={{ id: s.id }} className="flex-1 flex items-center gap-3 min-w-0">
+        <Link to="/levantamentos/$id" params={{ id: s.id }} search={{ mode: "edit" }} className="flex-1 flex items-center gap-3 min-w-0">
           <div className={`grid place-items-center rounded-md shrink-0 ${compact ? "h-7 w-7 bg-muted" : "h-9 w-9 bg-primary/10 text-primary"}`}>
             {compact ? <Lock className="h-3.5 w-3.5 text-muted-foreground" /> : <ClipboardList className="h-4 w-4" />}
           </div>

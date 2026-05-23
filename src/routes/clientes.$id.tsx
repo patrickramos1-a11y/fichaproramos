@@ -140,7 +140,7 @@ function ClienteDetail() {
                       </div>
                     </Link>
                     <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
-                      <Link to="/levantamentos/$id" params={{ id: survey.id }}>
+                      <Link to="/levantamentos/$id" params={{ id: survey.id }} search={{ mode: "edit" }}>
                         <Button variant="outline" size="sm" className="w-full">
                           <ClipboardList className="h-4 w-4 mr-1" /> Campo
                         </Button>

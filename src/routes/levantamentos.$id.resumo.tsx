@@ -65,7 +65,7 @@ function ResumoPage() {
 
   return (
     <AppShell>
-      <Link to="/levantamentos/$id" params={{ id }} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
+      <Link to="/levantamentos/$id" params={{ id }} search={{ mode: "edit" }} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
         <ArrowLeft className="h-4 w-4" /> Voltar ao preenchimento
       </Link>
 

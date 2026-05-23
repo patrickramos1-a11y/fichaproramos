@@ -41,7 +41,7 @@ function ProjetoDetail() {
 
   function create() {
     const selected = allTypes.find((entry) => entry.id === type);
-    if (!selected) return;
+    if (!selected || !project) return;
     const effectiveType: SurveyType = (selected.sourceTypeId as SurveyType | undefined) ?? selected.id;
     const s = addSurveyExt({
       clientId: project.clientId,
@@ -52,7 +52,7 @@ function ProjetoDetail() {
       customTypeId: selected.id,
     });
     setOpen(false); setTitle("");
-    nav({ to: "/levantamentos/$id", params: { id: s.id } });
+    nav({ to: "/levantamentos/$id", params: { id: s.id }, search: { mode: "edit" } });
   }
 
   return (

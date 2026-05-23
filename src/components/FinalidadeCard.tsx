@@ -10,10 +10,7 @@ interface Props {
   compact?: boolean;
 }
 
-/**
- * Módulo obrigatório "Para que serve este levantamento" (Fase 2).
- * Renderizado no topo do editor de levantamento. Seleção múltipla.
- */
+/** Etapa de classificacao final do levantamento. Selecao multipla em ordem fixa. */
 export function FinalidadeCard({ surveyId, purposes, readOnly, compact }: Props) {
   const selected = new Set(purposes ?? []);
 
@@ -49,7 +46,7 @@ export function FinalidadeCard({ surveyId, purposes, readOnly, compact }: Props)
                 disabled={readOnly}
                 title={SURVEY_PURPOSE_DESCRIPTIONS[p]}
                 onClick={() => toggle(p)}
-                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors whitespace-normal text-left ${
                   isOn
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-border bg-background text-foreground hover:border-primary/40"

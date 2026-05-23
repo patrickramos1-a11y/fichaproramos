@@ -5,7 +5,7 @@ import {
   useDBSelector, updateModule, setFieldValue, setFieldStatus, addAttachment,
   removeAttachment, addPendencia, removePendencia, setFieldNote, setFieldNA,
   setEnabledModules, useDBStatus, setModuleNA, setSubgroupNA, enableModule,
-  closeSurvey, closeSurveyWithAutoNA, reopenSurvey, addTemplate, setSubgroupNote, setModuleDone,
+  closeSurveyWithAutoNA, reopenSurvey, addTemplate, setSubgroupNote, setModuleDone,
   setSubgroupDone, useEffectiveModulesForSurvey, useSurveyTypeMeta,
 } from "@/lib/store";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,17 +16,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   ArrowLeft, FileText, Paperclip, Plus, Trash2, AlertTriangle, CheckCircle2,
   FileDown, Settings2, Files, ClipboardList, Signature, ChevronRight, Ban, Check, EyeOff,
   Lock, Unlock, Clock, Save, MessageSquarePlus,
   BookOpen, ListChecks,
 } from "lucide-react";
 import {
-  getModulesForType, shouldShowField, CENTRAL_TAB_MODULES,
+  shouldShowField, CENTRAL_TAB_MODULES,
   computeModuleStatus, computeSubgroupStatus, subgroupProgress,
 } from "@/lib/modules";
 import { FieldRenderer } from "@/components/FieldRenderer";
@@ -268,15 +264,6 @@ function SurveyEditorReady({ survey, projectName, clientName, activeTab, setActi
         {(persistPending || persistenceError) && <span className="text-muted-foreground ml-1 truncate">{persistenceError ?? "Salvando..."}</span>}
       </div>
 
-      <div className="mb-3">
-        <FinalidadeCard
-          surveyId={survey.id}
-          purposes={survey.purposes ?? []}
-          readOnly={!!survey.closedAt}
-          compact
-        />
-      </div>
-
       {/* Tabs de módulos com N/A inline */}
       <ModuleTabsBar
         survey={survey}
@@ -303,74 +290,15 @@ function SurveyEditorReady({ survey, projectName, clientName, activeTab, setActi
             const currentIdx = regularTabs.findIndex((m) => m.id === activeModule.id);
             const next = remaining.find((m) => regularTabs.indexOf(m) > currentIdx) ?? remaining[0];
             if (next) setActiveTab(next.id);
+            else setActiveTab("__encerramento");
           }}
         />
       )}
       {activeTab === "__documentos" && <DocumentsPanel survey={survey} />}
       {activeTab === "__pendencias" && <PendenciasPanel survey={survey} />}
       {activeTab === "__encerramento" && <EncerramentoPanel survey={survey} />}
-      {!survey.closedAt && activeTab !== "__encerramento" && (
-        <div className="mt-4">
-          <ConcluirLevantamentoButton survey={survey} />
-        </div>
-      )}
       </>)}
     </AppShell>
-  );
-}
-
-// =========== Botão Concluir Levantamento com confirmação ===========
-
-function ConcluirLevantamentoButton({ survey, size = "lg" }: { survey: any; size?: "sm" | "lg" }) {
-  const [open, setOpen] = useState(false);
-  const noPurposes = !survey.purposes || survey.purposes.length === 0;
-  return (
-    <>
-      <Card style={statusOutlineStyle("done")}>
-        <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold">Pronto para concluir?</div>
-            <div className="text-xs text-muted-foreground">
-              Campos não preenchidos serão marcados como “Não se aplica” e não aparecerão nos relatórios.
-            </div>
-          </div>
-          <Button
-            size={size}
-            disabled={noPurposes}
-            onClick={() => setOpen(true)}
-            style={{ backgroundColor: "var(--status-done)", color: "white" }}
-            title={noPurposes ? "Selecione ao menos uma finalidade antes de concluir" : "Concluir levantamento"}
-          >
-            <Lock className="h-4 w-4 mr-1" /> Concluir levantamento
-          </Button>
-        </CardContent>
-      </Card>
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Concluir este levantamento?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Todos os campos não preenchidos serão marcados como “Não se aplica” e não aparecerão nos
-              relatórios. Apenas informações preenchidas, pendências, documentos, fotos, coordenadas e
-              observações serão usadas na Visão Consolidada e no Relatório Detalhado.
-              {" "}Você poderá reabrir o levantamento depois.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                closeSurveyWithAutoNA(survey.id, nowHHMM());
-                updateModule(survey.id, "validacao", { status: "concluido" });
-                setOpen(false);
-              }}
-            >
-              Concluir levantamento
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
   );
 }
 
@@ -405,6 +333,34 @@ function ModuleTabsBar({ survey, regularTabs, hiddenModules, hasDocs, hasValidac
     return true;
   });
   const naTabs = regularTabs.filter((m) => (survey.modules[m.id] as ModuleState)?.naModule);
+  const progressTabs = visibleTabs.filter((m) => computeModuleStatus(m, survey.modules[m.id] as ModuleState) !== "nao_iniciado");
+  const todoTabs = visibleTabs.filter((m) => computeModuleStatus(m, survey.modules[m.id] as ModuleState) === "nao_iniciado");
+
+  const renderModuleChip = (m: any) => {
+    const st = survey.modules[m.id] as ModuleState;
+    const eff = computeModuleStatus(m, st);
+    const active = activeTab === m.id;
+    return (
+      <div key={m.id} className="inline-flex min-w-0 items-stretch rounded-md border overflow-hidden"
+        style={{ borderColor: active ? "var(--primary)" : "var(--border)" }}
+      >
+        <button
+          onClick={() => setActiveTab(m.id)}
+          className={`min-w-0 px-2.5 py-1.5 text-xs whitespace-normal text-left flex items-center gap-1.5 ${active ? "bg-primary text-primary-foreground" : "bg-card hover:bg-secondary"}`}
+        >
+          <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: `var(--status-${statusVarSuffix(eff)})` }} />
+          <span className="min-w-0 break-words">{m.title}</span>
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); setModuleNA(survey.id, m.id, true); }}
+          title="Marcar como não se aplica"
+          className={`px-1.5 border-l flex items-center shrink-0 ${active ? "bg-primary/90 text-primary-foreground border-primary-foreground/30 hover:bg-primary" : "bg-card border-border text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+        >
+          <Ban className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="mb-4">
@@ -420,59 +376,25 @@ function ModuleTabsBar({ survey, regularTabs, hiddenModules, hasDocs, hasValidac
         </button>
       </div>
       {!collapsed && (
-        <div className="overflow-x-auto -mx-1 px-1">
-          <div className="flex flex-wrap gap-1.5 pb-1">
-            {visibleTabs.map((m) => {
-              const st = survey.modules[m.id] as ModuleState;
-              const eff = computeModuleStatus(m, st);
-              const active = activeTab === m.id;
-              const done = eff === "concluido";
-              return (
-                <div key={m.id} className="inline-flex items-stretch rounded-md border overflow-hidden"
-                  style={{ borderColor: active ? "var(--primary)" : (done ? "var(--status-done)" : "var(--border)") }}
-                >
-                  <button
-                    onClick={() => setActiveTab(m.id)}
-                    className={`px-2.5 py-1 text-xs whitespace-nowrap flex items-center gap-1.5 ${active ? "bg-primary text-primary-foreground" : "bg-card hover:bg-secondary"}`}
-                  >
-                    {done ? (
-                      <Check className="h-3 w-3" style={{ color: active ? undefined : "var(--status-done)" }} />
-                    ) : (
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: `var(--status-${statusVarSuffix(eff)})` }} />
-                    )}
-                    <span>{m.title}</span>
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setModuleNA(survey.id, m.id, true); }}
-                    title="Marcar como não se aplica"
-                    className={`px-1.5 border-l flex items-center ${active ? "bg-primary/90 text-primary-foreground border-primary-foreground/30 hover:bg-primary" : "bg-card border-border text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
-                  >
-                    <Ban className="h-3 w-3" />
-                  </button>
-                </div>
-              );
-            })}
-            {naTabs.map((m) => {
-              const active = activeTab === m.id;
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => setActiveTab(m.id)}
-                  title={`${m.title} (N/A)`}
-                  className={`rounded-full h-6 min-w-6 px-1.5 text-[10px] inline-flex items-center gap-1 border border-dashed ${active ? "bg-secondary" : "bg-card hover:bg-secondary"} text-muted-foreground`}
-                >
-                  <Ban className="h-2.5 w-2.5" />
-                  <span className="max-w-[80px] truncate">{m.title}</span>
-                </button>
-              );
-            })}
+        <div className="-mx-1 px-1">
+          <div className="grid gap-2 pb-1">
+            {progressTabs.length > 0 && <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-1">Em andamento</div>}
+            {progressTabs.length > 0 && <div className="flex flex-wrap gap-1.5">{progressTabs.map(renderModuleChip)}</div>}
+            {todoTabs.length > 0 && <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-1">A fazer</div>}
+            {todoTabs.length > 0 && <div className="flex flex-wrap gap-1.5">{todoTabs.map(renderModuleChip)}</div>}
+            <div className="flex flex-wrap items-center gap-1.5">
+            {naTabs.length > 0 && (
+              <NaModulesPill survey={survey} na={naTabs} activeTab={activeTab} setActiveTab={setActiveTab} />
+            )}
             {doneTabs.length > 0 && (
               <DoneModulesPill survey={survey} done={doneTabs} activeTab={activeTab} setActiveTab={setActiveTab} />
             )}
             {hiddenModules.length > 0 && (
               <HiddenModulesPill survey={survey} hidden={hiddenModules} />
             )}
-            <span className="self-center text-muted-foreground mx-1">·</span>
+            {(naTabs.length > 0 || doneTabs.length > 0 || hiddenModules.length > 0) && (
+              <span className="self-center text-muted-foreground mx-1">·</span>
+            )}
             {hasDocs && (
               <TabPill icon={<Files className="h-3 w-3" />} active={activeTab === "__documentos"} onClick={() => setActiveTab("__documentos")}>Docs</TabPill>
             )}
@@ -484,8 +406,50 @@ function ModuleTabsBar({ survey, regularTabs, hiddenModules, hasDocs, hasValidac
             )}
           </div>
         </div>
+        </div>
       )}
     </div>
+  );
+}
+
+function NaModulesPill({ survey, na, activeTab, setActiveTab }: { survey: any; na: any[]; activeTab: string; setActiveTab: (t: string) => void }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className="rounded-md px-2.5 py-1 text-xs whitespace-nowrap inline-flex items-center gap-1.5 border border-dashed border-border bg-card hover:bg-secondary text-muted-foreground"
+          title="Módulos marcados como N/A"
+        >
+          <Ban className="h-3 w-3" /> {na.length} N/A
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-2">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground px-2 py-1">Módulos N/A</div>
+        <div className="grid gap-1 max-h-72 overflow-auto">
+          {na.map((m) => {
+            const active = activeTab === m.id;
+            return (
+              <div key={m.id} className="flex items-center gap-1">
+                <button
+                  className={`flex-1 text-left text-sm rounded-md px-2 py-1.5 hover:bg-secondary inline-flex items-center gap-2 ${active ? "bg-secondary" : ""}`}
+                  onClick={() => setActiveTab(m.id)}
+                >
+                  <Ban className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 break-words">{m.title}</span>
+                </button>
+                <button
+                  className="text-[11px] text-muted-foreground hover:text-foreground rounded-md px-2 py-1 hover:bg-secondary"
+                  onClick={() => setModuleNA(survey.id, m.id, false)}
+                  title="Reabrir módulo"
+                >
+                  Reabrir
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -640,24 +604,25 @@ function ModulePanel({ survey, module: m, onModuleDone }: { survey: any; module:
   return (
     <Card style={statusOutlineStyle(statusVarSuffix(effective))}>
       <CardContent className="p-4 md:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-lg font-semibold flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4 min-w-0">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold flex items-center gap-2 break-words">
               {m.title}
               {effective === "concluido" && <Check className="h-5 w-5" style={{ color: "var(--status-done)" }} />}
             </h2>
-            {m.description && <p className="text-sm text-muted-foreground">{m.description}</p>}
+            {m.description && <p className="text-sm text-muted-foreground break-words">{m.description}</p>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-start sm:justify-end gap-1.5 shrink-0 w-full sm:w-auto">
             <StatusBadge status={effective} />
             {state.moduleDone ? (
-              <Button variant="outline" size="sm" onClick={() => setModuleDone(survey.id, m.id, false)} title="Reabrir módulo">
+              <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => setModuleDone(survey.id, m.id, false)} title="Reabrir módulo">
                 <Unlock className="h-3.5 w-3.5 mr-1" /> Reabrir
               </Button>
             ) : (
               <Button
                 variant="outline"
                 size="sm"
+                className="h-8 px-2"
                 onClick={() => { setModuleDone(survey.id, m.id, true); onModuleDone?.(); }}
                 title="Concluir módulo"
                 style={{ borderColor: "var(--status-done)", color: "var(--status-done)" }}
@@ -665,7 +630,7 @@ function ModulePanel({ survey, module: m, onModuleDone }: { survey: any; module:
                 <Check className="h-3.5 w-3.5 mr-1" /> Concluir
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => setModuleNA(survey.id, m.id, true)} title="Marcar módulo como não se aplica">
+            <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => setModuleNA(survey.id, m.id, true)} title="Marcar módulo como não se aplica">
               <Ban className="h-3.5 w-3.5 mr-1" /> N/A
             </Button>
           </div>
@@ -825,7 +790,8 @@ function SubgroupBlock({ subgroup, renderField, state, isNA, onToggleNA, isDone,
 function DocumentsPanel({ survey }: { survey: any }) {
   const docState = survey.modules.documentos;
   const allAttachments: Array<{ moduleId: string; moduleTitle: string; att: any }> = [];
-  const allModules = getModulesForType(survey.type);
+  const allModules = useEffectiveModulesForSurvey(survey);
+  const docModule = allModules.find((m) => m.id === "documentos");
   for (const m of allModules) {
     const st = survey.modules[m.id];
     if (!st) continue;
@@ -886,7 +852,7 @@ function DocumentsPanel({ survey }: { survey: any }) {
       </Card>
 
       {/* Subgrupos e campos próprios do módulo documentos */}
-      <ModulePanel survey={survey} module={getModulesForType(survey.type).find((m) => m.id === "documentos")!} />
+      {docState && docModule && <ModulePanel survey={survey} module={docModule} />}
     </div>
   );
 }
@@ -896,7 +862,7 @@ function DocumentsPanel({ survey }: { survey: any }) {
 function PendenciasPanel({ survey }: { survey: any }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ module: "", description: "", responsible: "" });
-  const allModules = getModulesForType(survey.type);
+  const allModules = useEffectiveModulesForSurvey(survey);
 
   return (
     <Card>
@@ -952,7 +918,7 @@ function PendenciasPanel({ survey }: { survey: any }) {
 
 function EncerramentoPanel({ survey }: { survey: any }) {
   const validacao = survey.modules.validacao;
-  const allModules = getModulesForType(survey.type);
+  const allModules = useEffectiveModulesForSurvey(survey);
   const enabledIds: string[] = survey.enabledModules ?? allModules.map((m) => m.id);
   const enabledModules = allModules.filter((m) => enabledIds.includes(m.id) && !CENTRAL_TAB_MODULES.has(m.id));
 
@@ -970,6 +936,7 @@ function EncerramentoPanel({ survey }: { survey: any }) {
 
   const closed = !!survey.closedAt;
   const blockers = emAndamento.length + pendAbertas.length;
+  const noPurposes = !survey.purposes || survey.purposes.length === 0;
 
   // Cronômetro ao vivo até registrar saída
   const [tick, setTick] = useState(0);
@@ -1004,6 +971,8 @@ function EncerramentoPanel({ survey }: { survey: any }) {
           </CardContent>
         </Card>
       )}
+
+      <FinalidadeCard surveyId={survey.id} purposes={survey.purposes} readOnly={closed} />
 
       <Card>
         <CardContent className="p-5">
@@ -1064,16 +1033,17 @@ function EncerramentoPanel({ survey }: { survey: any }) {
               Atenção: ainda há {emAndamento.length} módulo(s) sem conclusão e {pendAbertas.length} pendência(s) aberta(s). Você pode encerrar mesmo assim.
             </div>
           )}
-          {!closed && (!survey.purposes || survey.purposes.length === 0) && (
+          {!closed && noPurposes && (
             <div className="mb-3 rounded-md border border-warn/40 bg-warn-soft p-2 text-xs text-warn-foreground">
-              Selecione ao menos uma finalidade no topo do levantamento antes de encerrar.
+              Selecione ao menos uma finalidade nesta etapa para liberar o encerramento.
             </div>
           )}
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             {!closed ? (
               <Button
-                disabled={!survey.purposes || survey.purposes.length === 0}
+                disabled={noPurposes}
                 onClick={() => { closeSurveyWithAutoNA(survey.id, horaSaida || nowHHMM()); updateModule(survey.id, "validacao", { status: "concluido" }); }}
+                title={noPurposes ? "Selecione ao menos uma finalidade para encerrar" : "Encerrar levantamento"}
               >
                 <Lock className="h-4 w-4 mr-1" /> Encerrar levantamento
               </Button>

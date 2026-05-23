@@ -115,7 +115,7 @@ function NovoPage() {
                     onChange={(e) => setClientQuery(e.target.value)}
                   />
                 </div>
-                <div className="rounded-md border border-border max-h-64 overflow-y-auto">
+                <div className="rounded-md border border-border max-h-[42dvh] overflow-y-auto overscroll-contain">
                   {filteredClients.length === 0 && !canQuickAdd && (
                     <div className="p-3 text-xs text-muted-foreground">Nenhum cliente cadastrado ainda.</div>
                   )}
@@ -186,7 +186,7 @@ function NovoPage() {
           )}
           <div>
             <Label className="mb-2 block">Tipo de levantamento</Label>
-            <div className="grid gap-2">
+            <div className="grid gap-2 max-h-[44dvh] overflow-y-auto overscroll-contain pr-1">
               {allTypes.map((c) => {
                 const Icon = getTypeIcon(c.icon);
                 const isActive = customTypeId === c.id;

@@ -138,6 +138,27 @@ function hasValue(v: unknown) {
   return true;
 }
 
+function hasFieldValue(field: FieldDef, v: unknown) {
+  if (field.type === "number" && field.unitOptions && typeof v === "object" && v !== null) {
+    const raw = (v as Record<string, unknown>).value;
+    return raw != null && String(raw).trim() !== "";
+  }
+  if (field.type === "coords" && typeof v === "object" && v !== null) {
+    const raw = v as Record<string, unknown>;
+    return raw.lat != null && raw.lat !== "" && raw.lng != null && raw.lng !== "";
+  }
+  return hasValue(v);
+}
+
+function isAutoCompletableField(field: FieldDef) {
+  if (field.type === "button-select") return !field.multi;
+  return ["text", "number", "date", "time", "boolean", "select", "coords"].includes(field.type);
+}
+
+function isBlurCompletableField(field: FieldDef) {
+  return field.type === "text" || field.type === "number" || field.type === "coords";
+}
+
 function summarize(field: FieldDef, value: any): string {
   if (!hasValue(value)) return "—";
   if (field.type === "boolean") return value ? "Sim" : "Não";
@@ -226,7 +247,7 @@ function formatPhoneBR(raw: string): string {
 }
 
 // ============================ NumberField (estrito) ===========================
-function NumberField({ field, value, onChange, onBlur, moduleValues }: { field: FieldDef; value: any; onChange: (v: any) => void; onBlur: () => void; moduleValues?: Record<string, any> }) {
+function NumberField({ field, value, onChange, onBlur, moduleValues }: { field: FieldDef; value: any; onChange: (v: any) => void; onBlur: (v: any) => void; moduleValues?: Record<string, any> }) {
   const allowDecimal = field.decimal !== false;
   const useUnit = !!field.unitOptions?.length;
   const v = useUnit && typeof value === "object" && value !== null ? value : { value: value ?? "", unit: useUnit ? field.unitOptions![0] : undefined };
@@ -304,7 +325,7 @@ function NumberField({ field, value, onChange, onBlur, moduleValues }: { field: 
             (e.target as HTMLInputElement).blur();
           }
         }}
-        onBlur={onBlur}
+        onBlur={() => onBlur(useUnit ? { value: cur, unit } : cur)}
       />
       {field.presets && field.presets.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -412,10 +433,10 @@ function ButtonSelectField({ field, value, onChange }: { field: FieldDef; value:
           <span key={o} className="inline-flex items-center">
             <button type="button" onClick={() => toggle(o)}
               style={checkedStyle}
-              className={`text-xs rounded-full px-3 py-1 border transition-colors inline-flex items-center gap-1 ${checked && !color ? "bg-primary text-primary-foreground border-primary" : ""} ${!checked ? "border-border hover:bg-secondary" : ""} ${isLearned ? "border-dashed" : ""}`}
+              className={`text-xs rounded-full px-3 py-1 border transition-colors inline-flex items-center gap-1 whitespace-normal text-left ${checked && !color ? "bg-primary text-primary-foreground border-primary" : ""} ${!checked ? "border-border hover:bg-secondary" : ""} ${isLearned ? "border-dashed" : ""}`}
               title={isLearned ? "Opção aprendida" : undefined}>
               {icon && <span aria-hidden>{icon}</span>}
-              <span>{o}</span>
+              <span className="break-words">{o}</span>
             </button>
             {isLearned && !checked && (
               <button type="button" onClick={() => forgetLearned(o)} title="Esquecer"
@@ -425,8 +446,8 @@ function ButtonSelectField({ field, value, onChange }: { field: FieldDef; value:
         );
       })}
       {otherItems.map((o) => (
-        <span key={o} className="text-xs rounded-full px-2.5 py-1 border bg-primary text-primary-foreground border-primary inline-flex items-center gap-1">
-          {o}
+        <span key={o} className="text-xs rounded-full px-2.5 py-1 border bg-primary text-primary-foreground border-primary inline-flex items-center gap-1 whitespace-normal text-left">
+          <span className="break-words">{o}</span>
           <button type="button" onClick={() => toggle(o)} className="opacity-80 hover:opacity-100">×</button>
         </span>
       ))}
@@ -492,7 +513,7 @@ function ApplyToSidesField({ field, value, onChange }: { field: FieldDef; value:
               <div className="flex flex-wrap gap-1.5">
                 {options.map((o) => (
                   <button type="button" key={o} onClick={() => setSide(side, o)}
-                    className={`text-xs rounded-full px-2.5 py-1 border ${cur === o ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary"}`}>
+                    className={`text-xs rounded-full px-2.5 py-1 border whitespace-normal text-left break-words ${cur === o ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary"}`}>
                     {o}
                   </button>
                 ))}
@@ -681,10 +702,10 @@ function RepeaterField({ field, value, onChange }: { field: FieldDef; value: any
               return (
                 <button key={p} type="button" onClick={() => !used && togglePickerSel(p)} disabled={used}
                   style={used ? undefined : (checkedStyle ?? unstyledColor)}
-                  className={`text-xs rounded-full px-2.5 py-1 border transition-colors inline-flex items-center gap-1 ${used ? "opacity-40 cursor-not-allowed border-border" : checked && !color ? "bg-primary text-primary-foreground border-primary" : !color ? "border-border hover:bg-secondary" : "hover:opacity-90"}`}
+                  className={`text-xs rounded-full px-2.5 py-1 border transition-colors inline-flex items-center gap-1 whitespace-normal text-left ${used ? "opacity-40 cursor-not-allowed border-border" : checked && !color ? "bg-primary text-primary-foreground border-primary" : !color ? "border-border hover:bg-secondary" : "hover:opacity-90"}`}
                   title={used ? "Já adicionado" : undefined}>
                   {icon && <span aria-hidden>{icon}</span>}
-                  <span>{p}</span>
+                  <span className="break-words">{p}</span>
                 </button>
               );
             })}
@@ -908,7 +929,7 @@ function HoursPresetEditor({ value, onChange }: { value: HoursValue | undefined;
             type="button"
             key={k}
             onClick={() => applyPreset(k)}
-            className={`text-xs rounded-full px-3 py-1 border ${preset === k ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary"}`}
+            className={`text-xs rounded-full px-3 py-1 border whitespace-normal text-left ${preset === k ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary"}`}
           >
             {HOURS_PRESET_LABEL[k]}
           </button>
@@ -948,18 +969,39 @@ function HoursPresetEditor({ value, onChange }: { value: HoursValue | undefined;
 }
 
 function FieldRendererComponent({ field, value, status, note, na, onChange, onStatus, onNote, onNA, moduleValues }: Props) {
-  const [collapsed, setCollapsed] = useState(status === "concluido" && hasValue(value));
+  const [collapsed, setCollapsed] = useState(() => status === "concluido" && hasFieldValue(field, value));
+  const previousStatus = useRef<FieldStatus>(status);
+  const autoCompletable = isAutoCompletableField(field);
+  const blurCompletable = isBlurCompletableField(field);
+  const filled = hasFieldValue(field, value);
 
-  // Recolhe somente quando o usuário marca explicitamente concluído.
+  // Recolhe quando o status muda para concluido, seja manualmente ou por auto-conclusao.
   useEffect(() => {
-    if (status === "concluido" && hasValue(value)) setCollapsed(true);
+    if (status === "concluido" && previousStatus.current !== "concluido" && filled) setCollapsed(true);
     if (status !== "concluido") setCollapsed(false);
-  }, [status, value]);
+    previousStatus.current = status;
+  }, [status, value, filled]);
+
+  function syncAutoStatus(nextValue: unknown, collapseWhenComplete = true) {
+    if (!autoCompletable) return;
+    if (hasFieldValue(field, nextValue)) {
+      if (status !== "concluido") onStatus("concluido");
+      if (collapseWhenComplete) setCollapsed(true);
+    } else if (status === "concluido") {
+      onStatus("nao_iniciado");
+      setCollapsed(false);
+    }
+  }
+
+  function handleAutoChange(nextValue: unknown, collapseWhenComplete = true) {
+    onChange(nextValue);
+    syncAutoStatus(nextValue, collapseWhenComplete);
+  }
 
   function captureCoords() {
     if (!navigator.geolocation) return alert("Geolocalização não disponível");
     navigator.geolocation.getCurrentPosition(
-      (pos) => onChange({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+      (pos) => handleAutoChange({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
       (err) => alert("Erro ao capturar: " + err.message),
     );
   }
@@ -967,13 +1009,13 @@ function FieldRendererComponent({ field, value, status, note, na, onChange, onSt
   // NA mode → renderiza versão compacta
   if (na) {
     return (
-      <div className="rounded-md border border-dashed border-border/70 p-2 px-3 bg-muted/30 flex items-center justify-between gap-2">
-        <div className="text-sm">
+      <div className="rounded-md border border-dashed border-border/70 p-2 px-3 bg-muted/30 flex items-center justify-between gap-2 min-w-0">
+        <div className="text-sm min-w-0 break-words">
           <span className="font-medium">{field.label}</span>
           <span className="ml-2 text-xs text-muted-foreground">Não se aplica</span>
         </div>
         {onNA && (
-          <Button variant="ghost" size="sm" onClick={() => onNA(false)} className="h-7">
+          <Button variant="ghost" size="sm" onClick={() => onNA(false)} className="h-7 shrink-0">
             <Pencil className="h-3 w-3 mr-1" /> Reabrir
           </Button>
         )}
@@ -982,12 +1024,12 @@ function FieldRendererComponent({ field, value, status, note, na, onChange, onSt
   }
 
   // Resumido (concluído + colapsado)
-  if (collapsed && hasValue(value) && status === "concluido") {
+  if (collapsed && filled && status === "concluido") {
     return (
-      <div className="rounded-md border border-border p-2 px-3 bg-card flex items-center justify-between gap-2">
+      <div className="rounded-md border border-border p-2 px-3 bg-card flex items-center justify-between gap-2 min-w-0">
         <div className="min-w-0">
-          <div className="text-sm font-medium truncate">{field.label}</div>
-          <div className="text-xs text-muted-foreground truncate">{summarize(field, value)}{field.unit && hasValue(value) ? ` ${field.unit}` : ""}</div>
+          <div className="text-sm font-medium break-words">{field.label}</div>
+          <div className="text-xs text-muted-foreground break-words">{summarize(field, value)}{field.unit && filled ? ` ${field.unit}` : ""}</div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <Check className="h-4 w-4" style={{ color: "var(--status-done)" }} />
@@ -1000,18 +1042,18 @@ function FieldRendererComponent({ field, value, status, note, na, onChange, onSt
   }
 
   return (
-    <div className="rounded-md border border-border p-3 bg-card">
+    <div className="rounded-md border border-border p-3 bg-card min-w-0">
       <div className="flex items-start justify-between gap-2 mb-2">
-        <label className="text-sm font-medium">
+        <label className="text-sm font-medium min-w-0 break-words">
           {field.label}{field.unit && <span className="text-muted-foreground font-normal"> ({field.unit})</span>}
         </label>
-        <div className="flex items-center gap-1">
-          {status === "concluido" && hasValue(value) ? (
+        <div className="flex items-center gap-1 shrink-0">
+          {status === "concluido" && filled ? (
             <Check className="h-4 w-4" style={{ color: "var(--status-done)" }} />
           ) : (
             <span
               className="h-2 w-2 rounded-full inline-block"
-              style={{ backgroundColor: hasValue(value) ? "var(--status-progress)" : "var(--status-todo)" }}
+              style={{ backgroundColor: filled ? "var(--status-progress)" : "var(--status-todo)" }}
               title={STATUS_LABELS[status]}
             />
           )}
@@ -1031,17 +1073,17 @@ function FieldRendererComponent({ field, value, status, note, na, onChange, onSt
         </div>
       </div>
 
-      {field.type === "text" && <Input value={value ?? ""} onChange={(e) => onChange(e.target.value)} />}
-      {field.type === "number" && <NumberField field={field} value={value} onChange={onChange} onBlur={() => {}} moduleValues={moduleValues} />}
+      {field.type === "text" && <Input value={value ?? ""} onChange={(e) => { onChange(e.target.value); if (!e.target.value && status === "concluido") syncAutoStatus(""); }} onBlur={(e) => syncAutoStatus(e.target.value)} />}
+      {field.type === "number" && <NumberField field={field} value={value} onChange={(v) => { onChange(v); if (!hasFieldValue(field, v) && status === "concluido") syncAutoStatus(v); }} onBlur={(v) => syncAutoStatus(v)} moduleValues={moduleValues} />}
       {field.type === "quantity" && <QuantityField value={value} onChange={onChange} />}
-      {field.type === "date" && <Input type="date" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />}
-      {field.type === "time" && <Input type="time" value={value ?? ""} onChange={(e) => onChange(e.target.value)} />}
+      {field.type === "date" && <Input type="date" value={value ?? ""} onChange={(e) => handleAutoChange(e.target.value)} />}
+      {field.type === "time" && <Input type="time" value={value ?? ""} onChange={(e) => handleAutoChange(e.target.value)} />}
       {field.type === "textarea" && <Textarea rows={3} value={value ?? ""} onChange={(e) => onChange(e.target.value)} />}
       {field.type === "boolean" && (
-        <div className="flex items-center gap-2"><Switch checked={!!value} onCheckedChange={onChange} /><span className="text-sm text-muted-foreground">{value ? "Sim" : "Não"}</span></div>
+        <div className="flex items-center gap-2"><Switch checked={!!value} onCheckedChange={(v) => handleAutoChange(v)} /><span className="text-sm text-muted-foreground">{value ? "Sim" : "Não"}</span></div>
       )}
       {field.type === "select" && (
-        <Select value={value ?? ""} onValueChange={(v) => { onChange(v); }}>
+        <Select value={value ?? ""} onValueChange={(v) => handleAutoChange(v)}>
           <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
           <SelectContent>{field.options!.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
         </Select>
@@ -1053,7 +1095,7 @@ function FieldRendererComponent({ field, value, status, note, na, onChange, onSt
             const checked = arr.includes(o);
             return (
               <button type="button" key={o} onClick={() => onChange(checked ? arr.filter((x) => x !== o) : [...arr, o])}
-                className={`text-xs rounded-full px-3 py-1 border ${checked ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary"}`}>
+                className={`text-xs rounded-full px-3 py-1 border whitespace-normal text-left break-words ${checked ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary"}`}>
                 {o}
               </button>
             );
@@ -1061,7 +1103,7 @@ function FieldRendererComponent({ field, value, status, note, na, onChange, onSt
         </div>
       )}
       {field.type === "button-select" && (
-        <ButtonSelectField field={field} value={value} onChange={onChange} />
+        <ButtonSelectField field={field} value={value} onChange={(v) => field.multi ? onChange(v) : handleAutoChange(v)} />
       )}
       {field.type === "apply-to-sides" && (
         <ApplyToSidesField field={field} value={value} onChange={onChange} />
@@ -1072,8 +1114,8 @@ function FieldRendererComponent({ field, value, status, note, na, onChange, onSt
       {field.type === "coords" && (
         <div className="flex flex-col gap-2">
           <div className="grid grid-cols-2 gap-2">
-            <Input placeholder="Latitude" value={value?.lat ?? ""} onChange={(e) => onChange({ ...(value || {}), lat: e.target.value })} />
-            <Input placeholder="Longitude" value={value?.lng ?? ""} onChange={(e) => onChange({ ...(value || {}), lng: e.target.value })} />
+            <Input placeholder="Latitude" value={value?.lat ?? ""} onChange={(e) => onChange({ ...(value || {}), lat: e.target.value })} onBlur={(e) => syncAutoStatus({ ...(value || {}), lat: e.target.value })} />
+            <Input placeholder="Longitude" value={value?.lng ?? ""} onChange={(e) => onChange({ ...(value || {}), lng: e.target.value })} onBlur={(e) => syncAutoStatus({ ...(value || {}), lng: e.target.value })} />
           </div>
           <Button type="button" size="sm" variant="outline" onClick={captureCoords}><MapPin className="h-4 w-4 mr-1" /> Capturar agora</Button>
           {value?.accuracy && <div className="text-xs text-muted-foreground">Precisão ~{Math.round(value.accuracy)}m</div>}
@@ -1093,7 +1135,7 @@ function FieldRendererComponent({ field, value, status, note, na, onChange, onSt
         <HoursPresetEditor value={value as HoursValue | undefined} onChange={onChange} />
       )}
 
-      {hasValue(value) && status !== "concluido" && (
+      {filled && status !== "concluido" && !autoCompletable && !blurCompletable && (
         <div className="mt-2 flex justify-end gap-1">
           <Button variant="ghost" size="sm" className="h-7 text-xs"
             style={{ color: "var(--status-done)" }}

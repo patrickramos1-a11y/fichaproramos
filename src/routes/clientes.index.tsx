@@ -65,7 +65,7 @@ function ClientesList() {
         </Button>
       </div>
 
-      <div className="relative mb-4">
+      <div className="relative mb-4 sticky top-2 z-10 bg-background/95 pb-1 backdrop-blur">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           value={q}
@@ -84,7 +84,7 @@ function ClientesList() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-2">
+        <div className="grid gap-2 max-h-[calc(100dvh-260px)] overflow-y-auto overscroll-contain pr-1">
           {filtered.map((c) => {
             const projetos = counts.projByClient.get(c.id) ?? 0;
             const surveys = counts.survByClient.get(c.id) ?? 0;

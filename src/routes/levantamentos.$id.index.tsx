@@ -586,6 +586,9 @@ function ModulePanel({ survey, module: m, onModuleDone }: { survey: any; module:
       />
     );
   }
+  const locationFields = m.id === "localizacao"
+    ? [...m.fields, ...subgroups.flatMap((sg: SubgroupDef) => sg.fields)]
+    : m.fields;
 
   // Módulo inteiro marcado como N/A → render compacto
   if (state.naModule) {
@@ -643,9 +646,9 @@ function ModulePanel({ survey, module: m, onModuleDone }: { survey: any; module:
           </div>
         )}
 
-        {m.fields.length > 0 && <div className="grid gap-2.5">{m.fields.map((f: FieldDef) => renderField(f))}</div>}
+        {locationFields.length > 0 && <div className="grid gap-2.5">{locationFields.map((f: FieldDef) => renderField(f))}</div>}
 
-        {m.id !== "fotos" && subgroups.length > 0 && (
+        {m.id !== "fotos" && m.id !== "localizacao" && subgroups.length > 0 && (
           <div className="mt-3 grid gap-2">
             {subgroups.map((sg: SubgroupDef) => (
               <SubgroupBlock

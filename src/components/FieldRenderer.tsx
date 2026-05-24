@@ -12,6 +12,13 @@ import { GeometryManager } from "./geom/GeometryManager";
 import type { SurveyGeometry } from "@/lib/geometryTypes";
 import { outlineAccentStyle } from "@/lib/colors";
 
+function geometryKindForField(fieldId: string): "point" | "line" | "polygon" | undefined {
+  if (fieldId.includes("pontos")) return "point";
+  if (fieldId.includes("linhas")) return "line";
+  if (fieldId.includes("poligonos")) return "polygon";
+  return undefined;
+}
+
 interface Props {
   field: FieldDef;
   value: any;
@@ -834,6 +841,7 @@ function RepeaterItemField({ field, value, onChange, autoFocus, onEnterAdd, onAp
           value={Array.isArray(value) ? (value as SurveyGeometry[]) : []}
           onChange={onChange}
           exportName={field.label || field.id}
+          only={geometryKindForField(field.id)}
         />
       )}
       {isCommentable && (
@@ -1115,6 +1123,7 @@ function FieldRendererComponent({ field, value, status, note, na, onChange, onSt
           value={Array.isArray(value) ? (value as SurveyGeometry[]) : []}
           onChange={onChange}
           exportName={field.label || field.id}
+          only={geometryKindForField(field.id)}
         />
       )}
       {field.type === "people" && (

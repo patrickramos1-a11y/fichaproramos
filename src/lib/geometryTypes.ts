@@ -3,6 +3,10 @@ export type GeometryKind = "point" | "line" | "polygon";
 export interface SurveyGeometry {
   id: string;
   kind: GeometryKind;
+  /** Fixed field ID shown to the user, such as P1, L1 or A1. */
+  code?: string;
+  /** Standard library type chosen during capture, such as Poco or Linha de drenagem. */
+  typeLabel?: string;
   name: string;
   description?: string;
   /** GeoJSON Geometry object: Point | LineString | Polygon (coords [lng,lat]) */

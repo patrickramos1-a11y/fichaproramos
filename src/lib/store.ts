@@ -19,7 +19,7 @@ import {
   OBRA_AMBIENTAL_REQUIRED_MODULE_IDS,
   OBRA_AMBIENTAL_TYPE_ID,
 } from "./surveyTypeIds";
-import { defaultTemplateKeysFor, defaultTemplateKeyFor, photoScopedOverridesForTemplate } from "./photoChecklists";
+import { defaultTemplateKeyFor, photoScopedOverridesForTemplate } from "./photoChecklists";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { saveSnapshot, loadSnapshot } from "./offlineSnapshot";
@@ -523,12 +523,16 @@ function seedBuiltInSurveyTypes() {
   }
 }
 
+function resolvePhotoChecklistKeys(type: SurveyType | string, customTypeId?: string): string[] {
+  return [defaultTemplateKeyFor(type, customTypeId)];
+}
+
 function repairPhotoChecklistKeysForSurveys() {
   let changed = false;
   const surveys = store.db.surveys.map((survey) => {
     const fotos = survey.modules?.fotos;
     if (!fotos) return survey;
-    const expected = defaultTemplateKeysFor(survey.type, survey.customTypeId);
+    const expected = resolvePhotoChecklistKeys(survey.type, survey.customTypeId);
     if (JSON.stringify(fotos.photoChecklistKeys ?? []) === JSON.stringify(expected)) return survey;
     changed = true;
     return {
@@ -750,7 +754,7 @@ function seedFactoryCustomSurveyTypes() {
   }
 
   const expectedModuleIds = new Set(expectedBindings.map((binding) => binding.moduleId));
-  const expectedPhotoKeys = defaultTemplateKeysFor("geral", OBRA_AMBIENTAL_TYPE_ID);
+  const expectedPhotoKeys = resolvePhotoChecklistKeys("geral", OBRA_AMBIENTAL_TYPE_ID);
   const nextSurveys = store.db.surveys.map((survey) => {
     if (survey.customTypeId !== OBRA_AMBIENTAL_TYPE_ID && survey.type !== OBRA_AMBIENTAL_TYPE_ID) return survey;
     let surveyChanged = false;
@@ -808,7 +812,7 @@ export function addSurveyExt(data: {
   if (modules.fotos) {
     modules.fotos = {
       ...modules.fotos,
-      photoChecklistKeys: defaultTemplateKeysFor(data.type, data.customTypeId),
+      photoChecklistKeys: resolvePhotoChecklistKeys(data.type, data.customTypeId),
     };
   }
 
@@ -1138,7 +1142,9 @@ function getPhotosState(sid: string): ModuleState | undefined {
 export function setPhotoChecklistKeys(sid: string, keys: string[]) {
   const st = getPhotosState(sid);
   if (!st) return;
-  updateModule(sid, PHOTOS_MOD, { photoChecklistKeys: Array.from(new Set(keys)) });
+  const firstKey = keys[0];
+  if (!firstKey) return;
+  updateModule(sid, PHOTOS_MOD, { photoChecklistKeys: [firstKey] });
 }
 
 export function setPhotoAnswer(

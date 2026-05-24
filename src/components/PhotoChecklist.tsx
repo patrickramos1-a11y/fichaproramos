@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   PHOTO_CHECKLISTS,
-  defaultTemplateKeysFor,
+  defaultTemplateKeyFor,
   composeItemId,
   type PhotoChecklistKey,
 } from "@/lib/photoChecklists";
@@ -29,8 +29,8 @@ interface Props {
 }
 
 export function PhotoChecklist({ survey, moduleState }: Props) {
-  const activeKeys: PhotoChecklistKey[] = useMemo(() => {
-    return defaultTemplateKeysFor(survey.type, survey.customTypeId);
+  const activeKey: PhotoChecklistKey = useMemo(() => {
+    return defaultTemplateKeyFor(survey.type, survey.customTypeId);
   }, [survey.type, survey.customTypeId]);
 
   const answers = moduleState.photoChecklist ?? [];
@@ -49,28 +49,19 @@ export function PhotoChecklist({ survey, moduleState }: Props) {
     return map;
   }, [moduleState.attachments]);
 
-  const activeTitle = PHOTO_CHECKLISTS[activeKeys[0]]?.title ?? "Relatorio fotografico";
+  const activeTitle = PHOTO_CHECKLISTS[activeKey]?.title ?? "Relatorio fotografico";
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">Checklist do tipo:</span>
-        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 text-xs">
-          {activeTitle}
-        </span>
-      </div>
-
-      {activeKeys.map((key) => (
-        <ChecklistTemplateCard
-          key={key}
-          surveyId={survey.id}
-          templateKey={key}
-          answerMap={answerMap}
-          photoCountByItem={photoCountByItem}
-          isPost={key === "post"}
-          liberado={moduleState.photoLiberadoDivulgacao}
-        />
-      ))}
+      <div className="text-xs text-muted-foreground">{activeTitle}</div>
+      <ChecklistTemplateCard
+        surveyId={survey.id}
+        templateKey={activeKey}
+        answerMap={answerMap}
+        photoCountByItem={photoCountByItem}
+        isPost={activeKey === "post"}
+        liberado={moduleState.photoLiberadoDivulgacao}
+      />
     </div>
   );
 }

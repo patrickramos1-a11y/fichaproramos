@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Camera, ImagePlus, Trash2, AlertTriangle } from "lucide-react";
 import { addAttachment, removeAttachment, setPhotoNote } from "@/lib/store";
-import { PHOTO_CHECKLISTS, defaultTemplateKeysFor, type PhotoChecklistKey } from "@/lib/photoChecklists";
+import { PHOTO_CHECKLISTS, defaultTemplateKeyFor } from "@/lib/photoChecklists";
 import type { Attachment, ModuleState, Survey } from "@/lib/types";
 
 const PHOTOS_MOD = "fotos";
@@ -24,29 +24,19 @@ function readFileAsDataUrl(file: File): Promise<string> {
 
 interface Props {
   survey: Survey;
-  /** Quando true, oculta itens marcados como "Não" sem permitir reabrir (modo só leitura). */
   readOnly?: boolean;
 }
 
 export function PhotoAttachmentsPanel({ survey, readOnly }: Props) {
   const state = (survey.modules[PHOTOS_MOD] ?? { attachments: [] }) as ModuleState;
-  const activeKeys = useMemo(
-    () => new Set(defaultTemplateKeysFor(survey.type, survey.customTypeId)),
+  const activeKey = useMemo(
+    () => defaultTemplateKeyFor(survey.type, survey.customTypeId),
     [survey.type, survey.customTypeId],
   );
+  const activeTitle = PHOTO_CHECKLISTS[activeKey]?.title ?? "Relatorio fotografico";
   const answers = (state.photoChecklist ?? []).filter(
-    (a) => a.registrado === true && activeKeys.has(a.templateKey as PhotoChecklistKey),
+    (answer) => answer.registrado === true && answer.templateKey === activeKey,
   );
-
-  const grouped = useMemo(() => {
-    const map = new Map<string, typeof answers>();
-    for (const a of answers) {
-      const arr = map.get(a.templateKey) ?? [];
-      arr.push(a);
-      map.set(a.templateKey, arr);
-    }
-    return map;
-  }, [answers]);
 
   const attachments = state.attachments ?? [];
   const attsByItem = useMemo(() => {
@@ -64,57 +54,46 @@ export function PhotoAttachmentsPanel({ survey, readOnly }: Props) {
     return (
       <Card>
         <CardContent className="p-5">
-          <h3 className="font-semibold mb-1">Anexar fotos do relatório fotográfico</h3>
+          <h3 className="mb-1 font-semibold">{activeTitle}</h3>
           <p className="text-sm text-muted-foreground">
-            Nenhum item marcado como “Sim” no checklist. Volte ao módulo Relatório
-            Fotográfico para escolher quais fotos foram realizadas.
+            Nenhum item fotografico foi marcado para anexo neste levantamento. Volte ao modulo
+            fotografico do tipo para indicar quais registros foram realmente realizados.
           </p>
         </CardContent>
       </Card>
     );
   }
 
-  const aguardando = answers.filter((a) => (attsByItem.get(a.itemId) ?? []).length === 0).length;
+  const aguardando = answers.filter((answer) => (attsByItem.get(answer.itemId) ?? []).length === 0).length;
 
   return (
     <Card>
-      <CardContent className="p-5 space-y-4">
+      <CardContent className="space-y-4 p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-semibold">Anexar fotos do relatório fotográfico</h3>
+          <h3 className="font-semibold">{activeTitle}</h3>
           {aguardando > 0 && (
             <span
-              className="inline-flex items-center gap-1 text-xs rounded-full border px-2 py-0.5"
+              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
               style={{ color: "var(--status-pending)", borderColor: "var(--status-pending)" }}
             >
-              <AlertTriangle className="h-3 w-3" /> {aguardando} item(s) aguardando anexo
+              <AlertTriangle className="h-3 w-3" /> {aguardando} item(ns) aguardando anexo
             </span>
           )}
         </div>
 
-        {Array.from(grouped.entries()).map(([templateKey, items]) => {
-          const tplTitle =
-            PHOTO_CHECKLISTS[templateKey as PhotoChecklistKey]?.title ?? templateKey;
-          return (
-            <div key={templateKey} className="space-y-2">
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                {tplTitle}
-              </div>
-              <div className="grid gap-2">
-                {items.map((a) => (
-                  <PhotoItemRow
-                    key={a.itemId}
-                    surveyId={survey.id}
-                    composedId={a.itemId}
-                    label={a.label}
-                    observacao={a.observacao ?? ""}
-                    attachments={attsByItem.get(a.itemId) ?? []}
-                    readOnly={readOnly}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
+        <div className="grid gap-2">
+          {answers.map((answer) => (
+            <PhotoItemRow
+              key={answer.itemId}
+              surveyId={survey.id}
+              composedId={answer.itemId}
+              label={answer.label}
+              observacao={answer.observacao ?? ""}
+              attachments={attsByItem.get(answer.itemId) ?? []}
+              readOnly={readOnly}
+            />
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
@@ -162,12 +141,12 @@ function PhotoItemRow({
 
   return (
     <div className="rounded-md border border-border p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm font-medium break-words">{label}</span>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="break-words text-sm font-medium">{label}</span>
           {empty && (
             <span
-              className="text-[10px] uppercase tracking-wider rounded px-1.5 py-0.5"
+              className="rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider"
               style={{
                 background: "color-mix(in oklab, var(--status-pending) 15%, transparent)",
                 color: "var(--status-pending)",
@@ -185,7 +164,7 @@ function PhotoItemRow({
               className="h-7 text-xs"
               onClick={() => cameraRef.current?.click()}
             >
-              <Camera className="h-3 w-3 mr-1" /> Câmera
+              <Camera className="mr-1 h-3 w-3" /> Camera
             </Button>
             <Button
               variant="outline"
@@ -193,7 +172,7 @@ function PhotoItemRow({
               className="h-7 text-xs"
               onClick={() => fileRef.current?.click()}
             >
-              <ImagePlus className="h-3 w-3 mr-1" /> Anexar imagens
+              <ImagePlus className="mr-1 h-3 w-3" /> Anexar imagens
             </Button>
             <input
               ref={cameraRef}
@@ -217,19 +196,19 @@ function PhotoItemRow({
       </div>
 
       {attachments.length > 0 && (
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mb-2">
+        <div className="mb-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
           {attachments.map((att) => (
-            <div key={att.id} className="relative group">
+            <div key={att.id} className="group relative">
               <img
                 src={att.dataUrl}
                 alt={att.name}
-                className="w-full h-20 object-cover rounded border border-border"
+                className="h-20 w-full rounded border border-border object-cover"
               />
               {!readOnly && (
                 <button
                   type="button"
                   onClick={() => removeAttachment(surveyId, PHOTOS_MOD, att.id)}
-                  className="absolute top-1 right-1 rounded bg-black/60 text-white p-0.5 opacity-0 group-hover:opacity-100 transition"
+                  className="absolute right-1 top-1 rounded bg-black/60 p-0.5 text-white opacity-0 transition group-hover:opacity-100"
                   aria-label="Remover imagem"
                 >
                   <Trash2 className="h-3 w-3" />
@@ -242,12 +221,12 @@ function PhotoItemRow({
 
       <Input
         defaultValue={observacao}
-        placeholder="Observação opcional"
+        placeholder="Observacao opcional"
         className="h-8 text-sm"
         disabled={readOnly}
         onBlur={(e) => {
-          const v = e.target.value;
-          if (v !== observacao) setPhotoNote(surveyId, composedId, v);
+          const value = e.target.value;
+          if (value !== observacao) setPhotoNote(surveyId, composedId, value);
         }}
       />
     </div>

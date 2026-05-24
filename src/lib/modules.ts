@@ -3,7 +3,14 @@ import type {
   FieldStatus, ModuleState, SubgroupDef, Person, HoursValue,
   FormStructureOverrides, CustomSurveyType,
 } from "./types";
-import { PHOTO_CHECKLISTS, ALL_TEMPLATE_KEYS } from "./photoChecklists";
+import {
+  PHOTO_CHECKLISTS,
+  ALL_TEMPLATE_KEYS,
+  defaultTemplateKeyFor,
+  PHOTO_MODULE_META_BY_TEMPLATE,
+  photoModuleDescriptionForTemplate,
+  photoModuleTitleForTemplate,
+} from "./photoChecklists";
 
 const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 const SIM_NAO_PARCIAL_AVALIADO = ["Sim", "Não", "Parcialmente", "Não avaliado"];
@@ -1584,7 +1591,7 @@ const MODULES_INDEX = new Map(MODULES.map((module) => [module.id, module]));
     return {
       id: `tpl_${key}`,
       title: tpl.title,
-      description: "Template de checklist fotográfico (Sim/Não por item).",
+      description: PHOTO_MODULE_META_BY_TEMPLATE[key]?.structureDescription ?? "Itens fotograficos especificos deste tipo de levantamento.",
       fields: tpl.items.map((it) => ({
         id: it.id,
         label: it.label,
@@ -1602,6 +1609,19 @@ const MODULES_BY_TYPE_CACHE: Record<SurveyType, typeof MODULES> = {
   terreno: MODULES_BY_TYPE.terreno.map((id) => MODULES_INDEX.get(id)!).filter(Boolean),
 };
 
+function specializePhotoModuleForType(modules: ModuleDef[], type: SurveyType): ModuleDef[] {
+  const photoKey = defaultTemplateKeyFor(type);
+  return modules.map((module) => {
+    if (module.id !== "fotos") return module;
+    return {
+      ...module,
+      title: photoModuleTitleForTemplate(photoKey),
+      description: photoModuleDescriptionForTemplate(photoKey),
+      subgroups: (module.subgroups ?? []).filter((sg) => sg.id === `tpl_${photoKey}`),
+    };
+  });
+}
+
 let _globalOverrides: FormStructureOverrides | undefined;
 let _globalOverridesRef: FormStructureOverrides | undefined;
 const _overriddenCache: Partial<Record<SurveyType, ModuleDef[]>> = {};
@@ -1615,7 +1635,7 @@ export function setGlobalFormOverrides(overrides: FormStructureOverrides | undef
 }
 
 export function getModulesForType(type: SurveyType): ModuleDef[] {
-  const base = MODULES_BY_TYPE_CACHE[type] ?? [];
+  const base = specializePhotoModuleForType(MODULES_BY_TYPE_CACHE[type] ?? [], type);
   if (!_globalOverrides || !hasAnyOverride(_globalOverrides)) return base;
   if (_overriddenCache[type]) return _overriddenCache[type]!;
   const computed = applyFormOverrides(base, _globalOverrides);
@@ -1983,3 +2003,4 @@ export function ensureLegacyAdapters(modules: Record<string, ModuleState>): Reco
   }
   return out;
 }
+

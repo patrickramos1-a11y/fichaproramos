@@ -5,6 +5,7 @@ import {
   createCustomSurveyType,
   deleteCustomSurveyType,
   duplicateCustomSurveyType,
+  moveCustomSurveyType,
   updateCustomSurveyType,
   useEffectiveModulesForCustomTypeId,
 } from "@/lib/store";
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ChevronRight, Layers, ListTree, FileText, Plus, Pencil, Copy, Trash2,
+  ChevronUp, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -97,15 +99,18 @@ export function TiposLevantamentoTab() {
                 const Icon = getTypeIcon(c.icon);
                 const color = c.color ?? autoColor(c.id);
                 const isActive = c.id === selectedId;
+                const idx = types.findIndex((type) => type.id === c.id);
                 return (
                   <li key={c.id}>
-                    <button
-                      onClick={() => setSelectedId(c.id)}
-                      className={`w-full text-left rounded-md px-2.5 py-2 transition-colors ${
+                    <div
+                      className={`flex items-center gap-1 rounded-md px-2 py-1.5 transition-colors ${
                         isActive ? "bg-primary text-primary-foreground" : "hover:bg-secondary"
                       }`}
                     >
-                      <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedId(c.id)}
+                        className="min-w-0 flex flex-1 items-center gap-2 text-left"
+                      >
                         <span
                           className="inline-flex h-6 w-6 items-center justify-center rounded-md shrink-0"
                           style={{ backgroundColor: color, color: "white", opacity: c.inactive ? 0.5 : 1 }}
@@ -124,8 +129,28 @@ export function TiposLevantamentoTab() {
                         >
                           {c.moduleBindings.length}
                         </Badge>
+                      </button>
+                      <div className="flex shrink-0 flex-col gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => moveCustomSurveyType(c.id, -1)}
+                          disabled={idx === 0}
+                          className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-black/10 disabled:opacity-30"
+                          title="Mover para cima"
+                        >
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveCustomSurveyType(c.id, 1)}
+                          disabled={idx === types.length - 1}
+                          className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-black/10 disabled:opacity-30"
+                          title="Mover para baixo"
+                        >
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </button>
                       </div>
-                    </button>
+                    </div>
                   </li>
                 );
               })}

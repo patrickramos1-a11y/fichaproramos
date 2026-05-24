@@ -35,6 +35,26 @@ function coordsDms(value: any) {
   return `${coordToDms(lat, "N", "S")}, ${coordToDms(lng, "E", "W")}`;
 }
 
+function semanticChipTone(option: string): { border: string; text: string; bg: string } | null {
+  const normalized = option.trim().toLowerCase();
+  if (["sim", "conforme", "concluido", "concluida"].includes(normalized)) {
+    return { border: "#22c55e", text: "#15803d", bg: "#dcfce7" };
+  }
+  if (["nao", "não", "nao conforme", "não conforme"].includes(normalized)) {
+    return { border: "#ef4444", text: "#b91c1c", bg: "#fee2e2" };
+  }
+  if (["parcialmente", "parcial"].includes(normalized)) {
+    return { border: "#f59e0b", text: "#b45309", bg: "#fef3c7" };
+  }
+  if (["nao avaliado", "não avaliado", "pendente"].includes(normalized)) {
+    return { border: "#64748b", text: "#475569", bg: "#e2e8f0" };
+  }
+  if (["nao se aplica", "não se aplica", "n/a"].includes(normalized)) {
+    return { border: "#8b5cf6", text: "#6d28d9", bg: "#ede9fe" };
+  }
+  return null;
+}
+
 interface Props {
   field: FieldDef;
   value: any;
@@ -446,12 +466,21 @@ function ButtonSelectField({ field, value, onChange }: { field: FieldDef; value:
         const isLearned = learnKey && learned.includes(o) && !baseOptions.includes(o);
         const color = colorByValue?.[o];
         const icon = iconByValue?.[o];
-        const checkedStyle = checked && color ? { backgroundColor: color, borderColor: color, color: "white" } : undefined;
+        const tone = semanticChipTone(o);
+        const checkedStyle = checked
+          ? color
+            ? { backgroundColor: color, borderColor: color, color: "white" }
+            : tone
+              ? { backgroundColor: tone.bg, borderColor: tone.border, color: tone.text }
+              : undefined
+          : tone
+            ? { borderColor: tone.border, color: tone.text, backgroundColor: "transparent" }
+            : undefined;
         return (
           <span key={o} className="inline-flex items-center">
             <button type="button" onClick={() => toggle(o)}
               style={checkedStyle}
-              className={`text-xs rounded-full px-3 py-1 border transition-colors inline-flex items-center gap-1 whitespace-normal text-left ${checked && !color ? "bg-primary text-primary-foreground border-primary" : ""} ${!checked ? "border-border hover:bg-secondary" : ""} ${isLearned ? "border-dashed" : ""}`}
+              className={`text-xs rounded-full px-3 py-1 border transition-colors inline-flex items-center gap-1 whitespace-normal text-left ${checked && !color && !tone ? "bg-primary text-primary-foreground border-primary" : ""} ${!checked && !tone ? "border-border hover:bg-secondary" : ""} ${isLearned ? "border-dashed" : ""}`}
               title={isLearned ? "Opção aprendida" : undefined}>
               {icon && <span aria-hidden>{icon}</span>}
               <span className="break-words">{o}</span>

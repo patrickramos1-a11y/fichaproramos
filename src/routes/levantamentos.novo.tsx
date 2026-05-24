@@ -1,18 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import {
-  useDB, addSurveyExt, addClient, useCustomSurveyTypes,
-} from "@/lib/store";
+import { addClient, addSurveyExt, useCustomSurveyTypes, useDB } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { type SurveyType } from "@/lib/types";
-import { useMemo, useState } from "react";
 import { autoColor } from "@/lib/colors";
 import { getTypeIcon } from "@/lib/typeIcons";
-import { Search, UserPlus, Check } from "lucide-react";
+import { Check, Search, UserPlus, Users, CalendarDays, PencilLine } from "lucide-react";
 
 export const Route = createFileRoute("/levantamentos/novo")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -21,214 +18,220 @@ export const Route = createFileRoute("/levantamentos/novo")({
   component: NovoPage,
 });
 
+function formatDateLabel(date: Date) {
+  return date.toLocaleDateString("pt-BR");
+}
+
+function buildDefaultTitle(typeLabel: string, date: Date) {
+  return `${typeLabel} - ${formatDateLabel(date)}`;
+}
+
 function NovoPage() {
   const db = useDB();
   const search = Route.useSearch();
-  const allTypes = useCustomSurveyTypes().filter((c) => !c.archivedAt && !c.inactive);
   const nav = useNavigate();
+  const allTypes = useCustomSurveyTypes().filter((type) => !type.archivedAt && !type.inactive);
+
   const [customTypeId, setCustomTypeId] = useState<string | undefined>(allTypes[0]?.id);
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState<string>(search.clientId ?? "");
-  const [empreendimentoId, setEmpreendimentoId] = useState<string>("none");
-  const [projectId, setProjectId] = useState<string>("none");
   const [clientQuery, setClientQuery] = useState("");
+  const [clientPickerOpen, setClientPickerOpen] = useState(!search.clientId);
 
-  const selected = allTypes.find((c) => c.id === customTypeId) ?? allTypes[0];
+  const selected = allTypes.find((type) => type.id === customTypeId) ?? allTypes[0];
   const effectiveType: SurveyType = (selected?.sourceTypeId as SurveyType | undefined) ?? selected?.id ?? "geral";
-  const selectedClient = db.clients.find((c) => c.id === clientId);
-  const clientEmpreendimentos = db.empreendimentos.filter((e) => e.clientId === clientId);
-  const clientProjects = db.projects.filter((p) => p.clientId === clientId);
+  const selectedClient = db.clients.find((client) => client.id === clientId);
+  const now = new Date();
 
   const filteredClients = useMemo(() => {
-    const q = clientQuery.trim().toLowerCase();
-    const list = [...db.clients].sort((a, b) => a.name.localeCompare(b.name));
-    if (!q) return list.slice(0, 8);
-    return list.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 8);
+    const query = clientQuery.trim().toLowerCase();
+    if (!query) return [];
+    return [...db.clients]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .filter((client) => {
+        const doc = client.cnpjCpf?.toLowerCase() ?? "";
+        return client.name.toLowerCase().includes(query) || doc.includes(query);
+      })
+      .slice(0, 8);
   }, [db.clients, clientQuery]);
 
   const exactMatch = filteredClients.some(
-    (c) => c.name.toLowerCase() === clientQuery.trim().toLowerCase(),
+    (client) => client.name.toLowerCase() === clientQuery.trim().toLowerCase(),
   );
-  const canQuickAdd = clientQuery.trim().length > 0 && !exactMatch;
+  const canQuickAdd = clientQuery.trim().length > 1 && !exactMatch;
+  const generatedTitle = buildDefaultTitle(selected?.label ?? "Levantamento", now);
 
-  function selectType(id: string, label: string) {
+  function selectType(id: string) {
     setCustomTypeId(id);
-    if (!title) setTitle(label);
-  }
-  function defaultTitle() {
-    return selected?.label ?? "Levantamento";
   }
 
   function quickAddClient() {
     const name = clientQuery.trim();
     if (!name) return;
-    const c = addClient({ name, personType: "PJ" });
-    setClientId(c.id);
-    setEmpreendimentoId("none");
-    setProjectId("none");
+    const client = addClient({ name, personType: "PJ" });
+    setClientId(client.id);
     setClientQuery("");
+    setClientPickerOpen(false);
   }
 
   function submit() {
     if (!clientId || !selected) return;
-    const s = addSurveyExt({
+    const survey = addSurveyExt({
       clientId,
-      empreendimentoId: empreendimentoId === "none" ? undefined : empreendimentoId,
-      projectId: projectId === "none" ? undefined : projectId,
       type: effectiveType,
-      title: title || defaultTitle(),
+      title: title.trim() || generatedTitle,
       customTypeId: selected.id,
     });
-    nav({ to: "/levantamentos/$id", params: { id: s.id }, search: { mode: "edit" } });
+    nav({ to: "/levantamentos/$id", params: { id: survey.id }, search: { mode: "edit" } });
   }
 
   return (
     <AppShell>
-      <h1 className="text-2xl font-semibold mb-6">Novo levantamento</h1>
-      <Card className="max-w-2xl">
-        <CardContent className="p-6 grid gap-5">
-          <div>
-            <Label>Cliente *</Label>
-            {selectedClient ? (
-              <div className="mt-2 flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 p-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Check className="h-4 w-4 text-primary shrink-0" />
+      <h1 className="mb-6 text-2xl font-semibold">Novo levantamento</h1>
+      <Card className="max-w-3xl">
+        <CardContent className="grid gap-6 p-4 sm:p-6">
+          <section className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label>Cliente *</Label>
+              {selectedClient && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={() => setClientPickerOpen((open) => !open)}
+                >
+                  {clientPickerOpen ? "Fechar" : "Trocar"}
+                </Button>
+              )}
+            </div>
+
+            {selectedClient && !clientPickerOpen ? (
+              <button
+                type="button"
+                onClick={() => setClientPickerOpen(true)}
+                className="flex w-full items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-left"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-primary" />
                   <div className="min-w-0">
-                    <div className="font-medium truncate">{selectedClient.name}</div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {selectedClient.personType === "PF" ? "Pessoa Física" : "Pessoa Jurídica"}
-                      {selectedClient.cnpjCpf ? ` · ${selectedClient.cnpjCpf}` : ""}
+                    <div className="truncate font-medium">{selectedClient.name}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {selectedClient.personType === "PF" ? "Pessoa Fisica" : "Pessoa Juridica"}
+                      {selectedClient.cnpjCpf ? ` - ${selectedClient.cnpjCpf}` : ""}
                     </div>
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => { setClientId(""); setEmpreendimentoId("none"); setProjectId("none"); }}>Trocar</Button>
-              </div>
+                <span className="shrink-0 text-xs text-primary">Trocar</span>
+              </button>
             ) : (
-              <div className="mt-2 grid gap-2">
+              <div className="space-y-2">
                 <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     autoFocus
-                    className="pl-8"
-                    placeholder="Buscar cliente pelo nome..."
+                    className="pl-9"
+                    placeholder="Digite para buscar ou cadastrar cliente"
                     value={clientQuery}
                     onChange={(e) => setClientQuery(e.target.value)}
                   />
                 </div>
-                <div className="rounded-md border border-border max-h-[42dvh] overflow-y-auto overscroll-contain">
-                  {filteredClients.length === 0 && !canQuickAdd && (
-                    <div className="p-3 text-xs text-muted-foreground">Nenhum cliente cadastrado ainda.</div>
-                  )}
-                  {filteredClients.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setClientId(c.id)}
-                      className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted transition-colors"
-                    >
-                      <span className="truncate">{c.name}</span>
-                      {c.cnpjCpf && (
-                        <span className="text-[11px] text-muted-foreground truncate">{c.cnpjCpf}</span>
-                      )}
-                    </button>
-                  ))}
-                  {canQuickAdd && (
-                    <button
-                      type="button"
-                      onClick={quickAddClient}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm border-t border-border bg-primary/5 hover:bg-primary/10 transition-colors text-primary"
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      Adicionar cliente “{clientQuery.trim()}”
-                    </button>
-                  )}
-                </div>
+                {clientQuery.trim().length > 0 && (
+                  <div className="max-h-[38dvh] overflow-y-auto rounded-xl border border-border overscroll-contain">
+                    {filteredClients.length === 0 && !canQuickAdd && (
+                      <div className="p-3 text-sm text-muted-foreground">Nenhum cliente encontrado.</div>
+                    )}
+                    {filteredClients.map((client) => (
+                      <button
+                        key={client.id}
+                        type="button"
+                        onClick={() => {
+                          setClientId(client.id);
+                          setClientPickerOpen(false);
+                        }}
+                        className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-muted"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium">{client.name}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {client.personType === "PF" ? "Pessoa Fisica" : "Pessoa Juridica"}
+                          </div>
+                        </div>
+                        {client.cnpjCpf && (
+                          <span className="truncate text-[11px] text-muted-foreground">{client.cnpjCpf}</span>
+                        )}
+                      </button>
+                    ))}
+                    {canQuickAdd && (
+                      <button
+                        type="button"
+                        onClick={quickAddClient}
+                        className="flex w-full items-center gap-2 border-t border-border bg-primary/5 px-3 py-3 text-left text-sm text-primary transition-colors hover:bg-primary/10"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        Cadastrar cliente "{clientQuery.trim()}"
+                      </button>
+                    )}
+                  </div>
+                )}
                 <p className="text-[11px] text-muted-foreground">
-                  Não precisa de projeto ou pasta. O levantamento será criado direto sob o cliente.
+                  O levantamento nasce direto no cliente. Projeto e empreendimento deixam de ser obrigatorios aqui.
                 </p>
               </div>
             )}
-          </div>
-          {selectedClient && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label>Empreendimento</Label>
-                <Select value={empreendimentoId} onValueChange={setEmpreendimentoId}>
-                  <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sem empreendimento</SelectItem>
-                    {clientEmpreendimentos.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Projeto</Label>
-                <Select value={projectId} onValueChange={(value) => {
-                  setProjectId(value);
-                  const project = db.projects.find((p) => p.id === value);
-                  if (project?.empreendimentoId) setEmpreendimentoId(project.empreendimentoId);
-                }}>
-                  <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sem projeto</SelectItem>
-                    {clientProjects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <p className="text-[11px] text-muted-foreground sm:col-span-2">
-                Projeto e empreendimento agora são contexto opcional; o vínculo principal é o cliente.
-              </p>
-            </div>
-          )}
-          <div>
-            <Label className="mb-2 block">Tipo de levantamento</Label>
-            <div className="grid gap-2 max-h-[44dvh] overflow-y-auto overscroll-contain pr-1">
-              {allTypes.map((c) => {
-                const Icon = getTypeIcon(c.icon);
-                const isActive = customTypeId === c.id;
-                const color = c.color ?? autoColor(c.id);
+          </section>
+
+          <section className="space-y-2">
+            <Label>Tipo de levantamento</Label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {allTypes.map((type) => {
+                const Icon = getTypeIcon(type.icon);
+                const isActive = customTypeId === type.id;
+                const color = type.color ?? autoColor(type.id);
                 return (
-                  <label
-                    key={c.id}
-                    className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors ${isActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
+                  <button
+                    key={type.id}
+                    type="button"
+                    onClick={() => selectType(type.id)}
+                    className={`flex min-w-0 items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
+                      isActive ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-background hover:border-primary/40"
+                    }`}
                   >
-                    <input
-                      type="radio"
-                      className="mt-1"
-                      checked={isActive}
-                      onChange={() => selectType(c.id, c.label)}
-                    />
-                    <span
-                      className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-md shrink-0"
-                      style={{ backgroundColor: color, color: "white" }}
-                    >
+                    <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: color, color: "white" }}>
                       <Icon className="h-4 w-4" />
                     </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium">{c.label}</div>
-                      {c.description && (
-                        <div className="text-xs text-muted-foreground">{c.description}</div>
-                      )}
-                      <div className="text-[11px] text-muted-foreground mt-0.5">
-                        {c.moduleBindings.length} módulo(s) vinculado(s)
-                      </div>
-                    </div>
-                  </label>
+                    <span className="min-w-0 flex-1">
+                      <span className="block break-words text-sm font-medium">{type.label}</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {type.moduleBindings.length} modulo(s)
+                      </span>
+                    </span>
+                    <span className={`h-4 w-4 shrink-0 rounded-full border ${isActive ? "border-primary bg-primary" : "border-muted-foreground/40"}`} />
+                  </button>
                 );
               })}
-              {allTypes.length === 0 && (
-                <div className="text-xs text-muted-foreground">
-                  Nenhum tipo cadastrado. Crie um em Configurações → Tipos de levantamento.
-                </div>
-              )}
             </div>
-          </div>
-          <div><Label>Título (opcional)</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
-          <Button onClick={submit} disabled={!clientId || !selected}>
+          </section>
+
+          <section className="space-y-2">
+            <div className="flex items-center gap-2">
+              <PencilLine className="h-4 w-4 text-muted-foreground" />
+              <Label>Titulo (opcional)</Label>
+            </div>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={generatedTitle}
+            />
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays className="h-3 w-3" />
+                Se ficar vazio, o sistema usa: {generatedTitle}
+              </span>
+            </div>
+          </section>
+
+          <Button onClick={submit} disabled={!clientId || !selected} className="h-12 text-base">
             Criar levantamento
           </Button>
         </CardContent>

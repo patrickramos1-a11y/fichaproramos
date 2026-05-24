@@ -74,9 +74,9 @@ export function PurposeChips({ purposes, max = 4 }: { purposes?: SurveyPurpose[]
       {visible.map((p) => (
         <span
           key={p}
-          className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-medium"
+          className="inline-flex max-w-full items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary"
         >
-          {SURVEY_PURPOSE_LABELS[p]}
+          <span className="break-words whitespace-normal">{SURVEY_PURPOSE_LABELS[p]}</span>
         </span>
       ))}
       {overflow > 0 && (

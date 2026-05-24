@@ -1556,6 +1556,17 @@ export function duplicateCustomSurveyType(id: string) {
   return copy;
 }
 
+export function moveCustomSurveyType(typeId: string, dir: -1 | 1) {
+  const list = store.db.customSurveyTypes ?? [];
+  const idx = list.findIndex((type) => type.id === typeId);
+  const target = idx + dir;
+  if (idx < 0 || target < 0 || target >= list.length) return;
+  const next = list.slice();
+  [next[idx], next[target]] = [next[target], next[idx]];
+  store.db = { ...store.db, customSurveyTypes: next };
+  persist();
+}
+
 /** Aplica um patch parcial ao escopo do tipo personalizado. */
 function mutateScoped(typeId: string, fn: (o: FormStructureOverrides) => FormStructureOverrides) {
   const list = store.db.customSurveyTypes ?? [];

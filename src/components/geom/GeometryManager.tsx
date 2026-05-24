@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { MapPin, Plus, Trash2, Pencil, Download, CheckCircle2, X, Spline, Hexagon, ChevronDown, ChevronUp, Map as MapIcon, FileArchive, Tags, MessageSquarePlus, CirclePlus } from "lucide-react";
+import { MapPin, Plus, Trash2, Pencil, Download, CheckCircle2, X, Spline, Hexagon, ChevronDown, ChevronUp, Map as MapIcon, FileArchive, Tags, MessageSquarePlus, CirclePlus, Building2, Waves, Factory, Landmark, Trees, Route, Droplets, Workflow, Warehouse, ShieldAlert, CircleDot } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { DraftVertex } from "./MapView";
@@ -46,6 +46,44 @@ const KIND_TONE: Record<GeometryKind, string> = {
 
 const KIND_CODE_PREFIX: Record<GeometryKind, string> = { point: "P", line: "L", polygon: "A" };
 const KIND_LABEL: Record<GeometryKind, string> = { point: "Ponto", line: "Linha", polygon: "Poligono/area" };
+
+const TYPE_PRESENTATION: Record<string, { icon: typeof MapPin; tone: string }> = {
+  "Sede": { icon: Building2, tone: "border-emerald-300 bg-emerald-50 text-emerald-800" },
+  "Poco": { icon: Droplets, tone: "border-sky-300 bg-sky-50 text-sky-800" },
+  "Posto de monitoramento": { icon: CircleDot, tone: "border-violet-300 bg-violet-50 text-violet-800" },
+  "Central de residuos": { icon: Factory, tone: "border-amber-300 bg-amber-50 text-amber-800" },
+  "Lagoa": { icon: Waves, tone: "border-cyan-300 bg-cyan-50 text-cyan-800" },
+  "Ponto de lancamento": { icon: Droplets, tone: "border-rose-300 bg-rose-50 text-rose-800" },
+  "Ponto de captacao": { icon: Landmark, tone: "border-blue-300 bg-blue-50 text-blue-800" },
+  "Reservatorio": { icon: Warehouse, tone: "border-indigo-300 bg-indigo-50 text-indigo-800" },
+  "Entrada/acesso": { icon: Route, tone: "border-slate-300 bg-slate-50 text-slate-800" },
+  "Linha de estrada": { icon: Route, tone: "border-stone-300 bg-stone-50 text-stone-800" },
+  "Linha de efluente": { icon: Workflow, tone: "border-rose-300 bg-rose-50 text-rose-800" },
+  "Linha de tubulacao": { icon: Workflow, tone: "border-indigo-300 bg-indigo-50 text-indigo-800" },
+  "Linha de drenagem": { icon: Droplets, tone: "border-sky-300 bg-sky-50 text-sky-800" },
+  "Caminho da agua": { icon: Waves, tone: "border-cyan-300 bg-cyan-50 text-cyan-800" },
+  "Escoamento de efluentes": { icon: Workflow, tone: "border-red-300 bg-red-50 text-red-800" },
+  "Escoamento irregular": { icon: ShieldAlert, tone: "border-orange-300 bg-orange-50 text-orange-800" },
+  "Linha de campo": { icon: Route, tone: "border-lime-300 bg-lime-50 text-lime-800" },
+  "Vala de infiltracao": { icon: Droplets, tone: "border-teal-300 bg-teal-50 text-teal-800" },
+  "Vala de contencao": { icon: ShieldAlert, tone: "border-yellow-300 bg-yellow-50 text-yellow-800" },
+  "Area de galpao": { icon: Warehouse, tone: "border-slate-300 bg-slate-50 text-slate-800" },
+  "Area de lagoa": { icon: Waves, tone: "border-cyan-300 bg-cyan-50 text-cyan-800" },
+  "Area de APP": { icon: Trees, tone: "border-green-300 bg-green-50 text-green-800" },
+  "Area construida": { icon: Building2, tone: "border-zinc-300 bg-zinc-50 text-zinc-800" },
+  "Area de vala de contencao": { icon: ShieldAlert, tone: "border-yellow-300 bg-yellow-50 text-yellow-800" },
+  "Area de disposicao": { icon: Factory, tone: "border-amber-300 bg-amber-50 text-amber-800" },
+  "Area de vegetacao": { icon: Trees, tone: "border-emerald-300 bg-emerald-50 text-emerald-800" },
+  "Area de intervencao": { icon: Landmark, tone: "border-rose-300 bg-rose-50 text-rose-800" },
+};
+
+function presentationForType(typeLabel?: string, kind?: GeometryKind) {
+  const match = typeLabel ? TYPE_PRESENTATION[typeLabel] : undefined;
+  if (match) return match;
+  if (kind === "line") return { icon: Spline, tone: "border-sky-300 bg-sky-50 text-sky-800" };
+  if (kind === "polygon") return { icon: Hexagon, tone: "border-amber-300 bg-amber-50 text-amber-800" };
+  return { icon: MapPin, tone: "border-emerald-300 bg-emerald-50 text-emerald-800" };
+}
 
 function geometryCode(g: SurveyGeometry, index: number) {
   if (g.code) return g.code;
@@ -235,8 +273,7 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
   };
 
   const groups = only ? [only] : (["point", "line", "polygon"] as GeometryKind[]);
-  const addLabel = activeMode === "point" ? "Adicionar ponto" : activeMode === "line" ? "Adicionar ponto da linha" : "Adicionar ponto da area";
-  const standardLabel = activeMode === "point" ? "Pontos padrao" : activeMode === "line" ? "Linhas padrao" : "Areas padrao";
+  const standardLabel = "Padroes";
 
   return (
     <div className="space-y-3 min-w-0">
@@ -277,11 +314,17 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
       )}
 
       <div className="grid grid-cols-[1fr_auto] gap-2">
-        <Button type="button" onClick={() => beginCapture(draft.length ? selectedType : "Outro")} disabled={disabled} className="h-11">
-          <Plus className="h-4 w-4 mr-2" /> {addLabel}
+        <Button
+          type="button"
+          onClick={() => beginCapture(draft.length ? selectedType : "Outro")}
+          disabled={disabled}
+          className="h-11"
+          title={activeMode === "point" ? "Capturar ponto" : activeMode === "line" ? "Capturar ponto da linha" : "Capturar ponto da area"}
+        >
+          <Plus className="h-4 w-4 mr-2" /> Capturar
         </Button>
         {!draft.length && (
-          <Button type="button" variant="outline" onClick={() => setTypePickerOpen(true)} disabled={disabled} className="h-11 px-3">
+          <Button type="button" variant="outline" onClick={() => setTypePickerOpen(true)} disabled={disabled} className="h-11 px-3" title="Abrir biblioteca de padroes">
             <Tags className="h-4 w-4 mr-1" /> {standardLabel}
           </Button>
         )}
@@ -337,11 +380,21 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
             <ul className="space-y-1.5">
               {list.map((g, index) => {
                 const code = geometryCode(g, index);
+                const presentation = presentationForType(g.typeLabel, g.kind);
+                const ItemIcon = presentation.icon;
                 return (
-                  <li key={g.id} className="rounded-md border bg-card px-2.5 py-2 text-xs">
+                  <li key={g.id} className={cn("rounded-md border px-2.5 py-2 text-xs", presentation.tone)}>
                     <div className="grid grid-cols-[1fr_auto] gap-2">
                       <div className="min-w-0">
-                        <div className="font-semibold break-words">{titleForGeometry(g, index)}</div>
+                        <div className="flex items-start gap-1.5">
+                          <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/80">
+                            <ItemIcon className="h-3 w-3" />
+                          </span>
+                          <div className="min-w-0">
+                            <div className="font-semibold break-words">{titleForGeometry(g, index)}</div>
+                            {g.typeLabel && <div className="text-[10px] font-medium opacity-80">{g.typeLabel}</div>}
+                          </div>
+                        </div>
                         {g.description && <p className="text-[11px] text-foreground/80 line-clamp-2 break-words">{g.description}</p>}
                         <div className="text-[10px] text-muted-foreground flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
                           {g.kind === "point" && <span className="font-mono break-all">{decimalPoint(g)}</span>}
@@ -377,15 +430,21 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
           <DialogHeader><DialogTitle>{standardLabel}</DialogTitle></DialogHeader>
           <div className="flex flex-wrap gap-2">
             {libraryForMode.map((item) => (
-              <button
-                key={item}
-                type="button"
-                className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-left text-xs font-medium shadow-sm", KIND_TONE[activeMode])}
-                onClick={() => beginCapture(item)}
-              >
-                {activeMode === "point" ? <MapPin className="h-3.5 w-3.5" /> : activeMode === "line" ? <Spline className="h-3.5 w-3.5" /> : <Hexagon className="h-3.5 w-3.5" />}
-                {item}
-              </button>
+              (() => {
+                const presentation = presentationForType(item, activeMode);
+                const ItemIcon = presentation.icon;
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-left text-xs font-medium shadow-sm", presentation.tone)}
+                    onClick={() => beginCapture(item)}
+                  >
+                    <ItemIcon className="h-3.5 w-3.5" />
+                    {item}
+                  </button>
+                );
+              })()
             ))}
             <button
               type="button"

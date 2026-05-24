@@ -70,7 +70,7 @@ function toDms(value: number, positive: string, negative: string) {
   const minFloat = (abs - deg) * 60;
   const min = Math.floor(minFloat);
   const sec = (minFloat - min) * 60;
-  return `${deg}deg${min}'${sec.toFixed(1)}"${value >= 0 ? positive : negative}`;
+  return `${deg}\u00b0${min}'${sec.toFixed(1)}"${value >= 0 ? positive : negative}`;
 }
 
 function pointDms(g: SurveyGeometry) {

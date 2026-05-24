@@ -31,6 +31,8 @@ import { ModuleConfigStep } from "@/components/ModuleConfigStep";
 import { PhotoChecklist } from "@/components/PhotoChecklist";
 import { PhotoAttachmentsPanel } from "@/components/PhotoAttachmentsPanel";
 import { type FieldStatus, type FieldDef, type SubgroupDef, type ModuleState } from "@/lib/types";
+import { GeometryManager } from "@/components/geom/GeometryManager";
+import type { SurveyGeometry } from "@/lib/geometryTypes";
 import { statusOutlineStyle } from "@/lib/colors";
 import { FinalidadeCard } from "@/components/FinalidadeCard";
 import { VisaoConsolidada } from "@/components/survey/VisaoConsolidada";
@@ -589,6 +591,25 @@ function ModulePanel({ survey, module: m, onModuleDone }: { survey: any; module:
   const locationFields = m.id === "localizacao"
     ? [...m.fields, ...subgroups.flatMap((sg: SubgroupDef) => sg.fields)]
     : m.fields;
+  const locationCoordFields = locationFields.filter((f: FieldDef) => f.type === "coords");
+  const locationGeometries: SurveyGeometry[] = m.id === "localizacao"
+    ? [
+        ...(Array.isArray(values.pontos_gps) ? values.pontos_gps as SurveyGeometry[] : []),
+        ...(Array.isArray(values.linhas_gps) ? values.linhas_gps as SurveyGeometry[] : []),
+        ...(Array.isArray(values.poligonos_gps) ? values.poligonos_gps as SurveyGeometry[] : []),
+      ]
+    : [];
+  function handleLocationGeometriesChange(next: SurveyGeometry[]) {
+    const points = next.filter((g) => g.kind === "point");
+    const lines = next.filter((g) => g.kind === "line");
+    const polygons = next.filter((g) => g.kind === "polygon");
+    handleFieldChange("pontos_gps", points);
+    handleFieldChange("linhas_gps", lines);
+    handleFieldChange("poligonos_gps", polygons);
+    handleFieldStatus("pontos_gps", points.length ? "concluido" : "nao_iniciado");
+    handleFieldStatus("linhas_gps", lines.length ? "concluido" : "nao_iniciado");
+    handleFieldStatus("poligonos_gps", polygons.length ? "concluido" : "nao_iniciado");
+  }
 
   // Módulo inteiro marcado como N/A → render compacto
   if (state.naModule) {
@@ -646,7 +667,24 @@ function ModulePanel({ survey, module: m, onModuleDone }: { survey: any; module:
           </div>
         )}
 
-        {locationFields.length > 0 && <div className="grid gap-2.5">{locationFields.map((f: FieldDef) => renderField(f))}</div>}
+        {m.id === "localizacao" ? (
+          <div className="grid gap-3">
+            {locationCoordFields.length > 0 && (
+              <div className="grid gap-2.5">
+                {locationCoordFields.map((f: FieldDef) => renderField(f))}
+              </div>
+            )}
+            <div className="rounded-lg border bg-card/60 p-3 min-w-0">
+              <GeometryManager
+                value={locationGeometries}
+                onChange={handleLocationGeometriesChange}
+                exportName="Localizacao e Coordenadas"
+              />
+            </div>
+          </div>
+        ) : (
+          m.fields.length > 0 && <div className="grid gap-2.5">{m.fields.map((f: FieldDef) => renderField(f))}</div>
+        )}
 
         {m.id !== "fotos" && m.id !== "localizacao" && subgroups.length > 0 && (
           <div className="mt-3 grid gap-2">

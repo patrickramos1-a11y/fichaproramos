@@ -19,6 +19,22 @@ function geometryKindForField(fieldId: string): "point" | "line" | "polygon" | u
   return undefined;
 }
 
+function coordToDms(value: number, positive: string, negative: string) {
+  const abs = Math.abs(value);
+  const deg = Math.floor(abs);
+  const minFloat = (abs - deg) * 60;
+  const min = Math.floor(minFloat);
+  const sec = (minFloat - min) * 60;
+  return `${deg}\u00b0${min}'${sec.toFixed(1)}"${value >= 0 ? positive : negative}`;
+}
+
+function coordsDms(value: any) {
+  const lat = Number(value?.lat);
+  const lng = Number(value?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "";
+  return `${coordToDms(lat, "N", "S")}, ${coordToDms(lng, "E", "W")}`;
+}
+
 interface Props {
   field: FieldDef;
   value: any;
@@ -1116,6 +1132,7 @@ function FieldRendererComponent({ field, value, status, note, na, onChange, onSt
           </div>
           <Button type="button" size="sm" variant="outline" onClick={captureCoords}><MapPin className="h-4 w-4 mr-1" /> Capturar agora</Button>
           {value?.accuracy && <div className="text-xs text-muted-foreground">Precisão ~{Math.round(value.accuracy)}m</div>}
+          {coordsDms(value) && <div className="text-xs text-muted-foreground font-mono break-words">GMS: {coordsDms(value)}</div>}
         </div>
       )}
       {field.type === "geometries" && (

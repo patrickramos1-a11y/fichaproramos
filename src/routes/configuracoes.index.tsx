@@ -45,6 +45,7 @@ import {
   removeTemplate,
   setTemplateDefault,
   duplicateTemplate,
+  resetOperationalData,
 } from "@/lib/store";
 import {
   SURVEY_TYPES,
@@ -57,7 +58,7 @@ import { FACTORY_TEMPLATES, MODULE_PRESETS, getModulesForType } from "@/lib/modu
 import {
   Star, Pencil, Trash2, Copy, Plus, ChevronDown, ChevronRight,
   Check, Search, Sparkles, FileStack, Eraser, RotateCcw, MoreVertical,
-  LayoutTemplate, Filter, Layers, ListTree, Library, Compass,
+  LayoutTemplate, Filter, Layers, ListTree, Library, Compass, ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { TiposLevantamentoTab } from "@/components/configuracoes/TiposLevantamentoTab";
@@ -129,6 +130,34 @@ function ConfiguracoesPage() {
             <Sparkles className="h-3.5 w-3.5 mr-1.5" />
             {seeding ? "Gerando…" : alreadySeeded ? "Gerar dados de demonstração novamente" : "Gerar dados de demonstração"}
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="border-destructive/30 text-destructive hover:bg-destructive/5">
+                <ShieldAlert className="h-3.5 w-3.5 mr-1.5" />
+                Resetar dados operacionais
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Apagar clientes e levantamentos atuais?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acao remove clientes, empreendimentos, projetos, levantamentos e snapshots offline, mas preserva tipos,
+                  modulos, templates e configuracoes da plataforma.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    resetOperationalData();
+                    toast.success("Dados operacionais resetados.");
+                  }}
+                >
+                  Resetar agora
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </header>
 

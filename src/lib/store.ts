@@ -22,7 +22,7 @@ import {
 import { defaultTemplateKeyFor, photoScopedOverridesForTemplate } from "./photoChecklists";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { saveSnapshot, loadSnapshot } from "./offlineSnapshot";
+import { saveSnapshot, loadSnapshot, clearSnapshot } from "./offlineSnapshot";
 
 interface DB {
   clients: Client[];
@@ -556,6 +556,11 @@ function persist() {
   scheduleEmit();
 }
 
+function persistImmediate() {
+  queueSync(true);
+  scheduleEmit();
+}
+
 function subscribe(listener: () => void) {
   store.listeners.add(listener);
   return () => {
@@ -924,6 +929,20 @@ export function bulkDeleteSurveys(sids: string[]) {
   const set = new Set(sids);
   store.db = { ...store.db, surveys: store.db.surveys.filter((s) => !set.has(s.id)) };
   persist();
+}
+
+export function resetOperationalData() {
+  store.db = {
+    ...store.db,
+    clients: [],
+    empreendimentos: [],
+    projects: [],
+    surveys: [],
+  };
+  if (store.userId) {
+    idle(() => void clearSnapshot());
+  }
+  persistImmediate();
 }
 
 /** Define as finalidades (Fase 2) de um levantamento. */

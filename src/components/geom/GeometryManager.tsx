@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { MapPin, Plus, Trash2, Pencil, Download, CheckCircle2, X, Spline, Hexagon, ChevronDown, ChevronUp, Map as MapIcon, FileArchive } from "lucide-react";
+import { MapPin, Plus, Trash2, Pencil, Download, CheckCircle2, X, Spline, Hexagon, ChevronDown, ChevronUp, Map as MapIcon, FileArchive, Tags, MessageSquarePlus, CirclePlus } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { DraftVertex } from "./MapView";
@@ -37,6 +37,13 @@ const GEOMETRY_TYPE_LIBRARY: Record<GeometryKind, string[]> = {
   polygon: ["Area de galpao", "Area de lagoa", "Area de APP", "Area construida", "Area de vala de contencao", "Area de disposicao", "Area de vegetacao", "Area de intervencao", "Outro"],
 };
 
+const LIBRARY_STORAGE_KEY = "fpr.geometry.customTypes.v1";
+const KIND_TONE: Record<GeometryKind, string> = {
+  point: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  line: "border-sky-200 bg-sky-50 text-sky-900",
+  polygon: "border-amber-200 bg-amber-50 text-amber-900",
+};
+
 const KIND_CODE_PREFIX: Record<GeometryKind, string> = { point: "P", line: "L", polygon: "A" };
 const KIND_LABEL: Record<GeometryKind, string> = { point: "Ponto", line: "Linha", polygon: "Poligono/area" };
 
@@ -55,7 +62,8 @@ function descriptiveName(g: SurveyGeometry, code: string) {
 function titleForGeometry(g: SurveyGeometry, index: number) {
   const code = geometryCode(g, index);
   const name = descriptiveName(g, code);
-  return name ? `${code} - ${name}` : code;
+  const base = name ? `${code} - ${name}` : code;
+  return g.customName ? `${base} - ${g.customName}` : base;
 }
 
 function decimalPoint(g: SurveyGeometry) {
@@ -98,11 +106,22 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
   const [draft, setDraft] = useState<DraftVertex[]>([]);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
-  const [namingOpen, setNamingOpen] = useState(false);
-  const [namingForm, setNamingForm] = useState({ name: "", description: "" });
+  const [editOpen, setEditOpen] = useState<"name" | "description" | null>(null);
+  const [editValue, setEditValue] = useState("");
   const [editing, setEditing] = useState<SurveyGeometry | null>(null);
   const [typePickerOpen, setTypePickerOpen] = useState(false);
+  const [customTypeOpen, setCustomTypeOpen] = useState(false);
+  const [customTypeName, setCustomTypeName] = useState("");
   const [selectedType, setSelectedType] = useState("Outro");
+  const [customTypes, setCustomTypes] = useState<Record<GeometryKind, string[]>>(() => {
+    try {
+      if (typeof window === "undefined") return { point: [], line: [], polygon: [] };
+      const parsed = JSON.parse(localStorage.getItem(LIBRARY_STORAGE_KEY) || "{}");
+      return { point: parsed.point || [], line: parsed.line || [], polygon: parsed.polygon || [] };
+    } catch {
+      return { point: [], line: [], polygon: [] };
+    }
+  });
 
   const activeMode = only || mode;
   const visibleGeoms = only ? geometries.filter((g) => g.kind === only) : geometries;
@@ -118,6 +137,8 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
     return total > 0 ? `${typeLabel} ${total + 1}` : typeLabel;
   };
 
+  const libraryForMode = [...GEOMETRY_TYPE_LIBRARY[activeMode], ...customTypes[activeMode]];
+
   const beginCapture = (typeLabel: string) => {
     if (!("geolocation" in navigator)) {
       toast.error("Geolocalizacao nao suportada neste dispositivo");
@@ -126,6 +147,18 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
     setSelectedType(typeLabel);
     setTypePickerOpen(false);
     setCaptureOpen(true);
+  };
+
+  const saveCustomType = () => {
+    const name = customTypeName.trim();
+    if (!name) return;
+    setCustomTypes((prev) => {
+      const next = { ...prev, [activeMode]: [...prev[activeMode], name] };
+      if (typeof window !== "undefined") localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+    setCustomTypeName("");
+    setCustomTypeOpen(false);
   };
 
   const handleCaptured = (cp: CapturedGpsPoint) => {
@@ -160,9 +193,7 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
   const openClose = () => {
     if (activeMode === "polygon" && draft.length < 3) { toast.error("Adicione pelo menos 3 pontos para fechar o poligono."); return; }
     if (activeMode === "line" && draft.length < 2) { toast.error("Adicione pelo menos 2 pontos para criar uma linha."); return; }
-    const typeLabel = selectedType || "Outro";
-    setNamingForm({ name: suggestedName(activeMode, typeLabel), description: "" });
-    setNamingOpen(true);
+    commitDraft();
   };
 
   const commitDraft = () => {
@@ -185,8 +216,7 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
       kind: activeMode,
       code: nextCode(activeMode),
       typeLabel: selectedType || "Outro",
-      name: namingForm.name.trim() || suggestedName(activeMode, selectedType || "Outro"),
-      description: namingForm.description.trim() || undefined,
+      name: suggestedName(activeMode, selectedType || "Outro"),
       geojson,
       area_m2,
       length_m,
@@ -194,17 +224,19 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
     });
     toast.success(activeMode === "polygon" ? "Poligono salvo" : "Linha salva");
     setDraft([]);
-    setNamingOpen(false);
   };
 
   const saveEdit = () => {
     if (!editing) return;
-    updateGeometry(editing.id, { name: namingForm.name.trim(), description: namingForm.description.trim() || undefined });
+    const value = editValue.trim();
+    updateGeometry(editing.id, editOpen === "name" ? { customName: value || undefined } : { description: value || undefined });
     setEditing(null);
+    setEditOpen(null);
   };
 
   const groups = only ? [only] : (["point", "line", "polygon"] as GeometryKind[]);
-  const addLabel = activeMode === "point" ? "Adicionar ponto" : activeMode === "line" ? "Adicionar linha" : "Adicionar poligono/area";
+  const addLabel = activeMode === "point" ? "Adicionar ponto" : activeMode === "line" ? "Adicionar ponto da linha" : "Adicionar ponto da area";
+  const standardLabel = activeMode === "point" ? "Pontos padrao" : activeMode === "line" ? "Linhas padrao" : "Areas padrao";
 
   return (
     <div className="space-y-3 min-w-0">
@@ -244,9 +276,16 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
         </div>
       )}
 
-      <Button type="button" onClick={() => setTypePickerOpen(true)} disabled={disabled} className="w-full h-11">
-        <Plus className="h-4 w-4 mr-2" /> {addLabel}
-      </Button>
+      <div className="grid grid-cols-[1fr_auto] gap-2">
+        <Button type="button" onClick={() => beginCapture(draft.length ? selectedType : "Outro")} disabled={disabled} className="h-11">
+          <Plus className="h-4 w-4 mr-2" /> {addLabel}
+        </Button>
+        {!draft.length && (
+          <Button type="button" variant="outline" onClick={() => setTypePickerOpen(true)} disabled={disabled} className="h-11 px-3">
+            <Tags className="h-4 w-4 mr-1" /> {standardLabel}
+          </Button>
+        )}
+      </div>
 
       {(activeMode === "polygon" || activeMode === "line") && draft.length > 0 && (
         <div className="rounded-lg border border-warn/40 bg-warn-soft p-2 space-y-2">
@@ -314,9 +353,12 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
                           {(g.captured_at || g.created_at) && <span>{formatDateTime(g.captured_at || g.created_at)}</span>}
                         </div>
                       </div>
-                      <div className="flex items-center gap-0.5 shrink-0">
+                      <div className="flex flex-wrap items-center justify-end gap-0.5 shrink-0 max-w-[7rem]">
                         <button type="button" onClick={() => exportSingleKml(g)} className="h-8 w-8 rounded flex items-center justify-center text-primary hover:bg-primary/10" title={`Exportar ${code} em KML`}><Download className="h-3.5 w-3.5" /></button>
-                        <button type="button" onClick={() => { setEditing(g); setNamingForm({ name: descriptiveName(g, code), description: g.description || "" }); }} className="h-8 w-8 rounded flex items-center justify-center text-muted-foreground hover:bg-muted" title="Editar"><Pencil className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => { setEditing(g); setEditOpen("name"); setEditValue(g.customName || ""); }} className="h-8 w-8 rounded flex items-center justify-center text-muted-foreground hover:bg-muted" title={g.customName ? "Editar nome complementar" : "Adicionar nome"}><Pencil className="h-3.5 w-3.5" /></button>
+                        {g.customName && (
+                          <button type="button" onClick={() => { setEditing(g); setEditOpen("description"); setEditValue(g.description || ""); }} className="h-8 w-8 rounded flex items-center justify-center text-muted-foreground hover:bg-muted" title={g.description ? "Editar descricao" : "Adicionar descricao"}><MessageSquarePlus className="h-3.5 w-3.5" /></button>
+                        )}
                         <button type="button" onClick={() => { if (confirm(`Excluir ${titleForGeometry(g, index)}?`)) removeGeometry(g.id); }} className="h-8 w-8 rounded flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive" title="Excluir"><Trash2 className="h-3.5 w-3.5" /></button>
                       </div>
                     </div>
@@ -332,63 +374,69 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
 
       <Dialog open={typePickerOpen} onOpenChange={setTypePickerOpen}>
         <DialogContent className="top-4 translate-y-0 max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:top-[50%] sm:translate-y-[-50%]">
-          <DialogHeader><DialogTitle>Adicionar {KIND_LABEL[activeMode]}</DialogTitle></DialogHeader>
-          <div className="grid grid-cols-1 gap-2">
-            {GEOMETRY_TYPE_LIBRARY[activeMode].map((item) => (
-              <button key={item} type="button" className="rounded-md border px-3 py-2 text-left text-sm hover:bg-secondary" onClick={() => beginCapture(item)}>
+          <DialogHeader><DialogTitle>{standardLabel}</DialogTitle></DialogHeader>
+          <div className="flex flex-wrap gap-2">
+            {libraryForMode.map((item) => (
+              <button
+                key={item}
+                type="button"
+                className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-left text-xs font-medium shadow-sm", KIND_TONE[activeMode])}
+                onClick={() => beginCapture(item)}
+              >
+                {activeMode === "point" ? <MapPin className="h-3.5 w-3.5" /> : activeMode === "line" ? <Spline className="h-3.5 w-3.5" /> : <Hexagon className="h-3.5 w-3.5" />}
                 {item}
               </button>
             ))}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-full border border-dashed px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-secondary"
+              onClick={() => setCustomTypeOpen(true)}
+            >
+              <CirclePlus className="h-3.5 w-3.5" />
+              Novo padrao
+            </button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={namingOpen} onOpenChange={setNamingOpen}>
-        <DialogContent className="top-4 translate-y-0 max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:top-[50%] sm:translate-y-[-50%]">
-          <DialogHeader><DialogTitle>{activeMode === "polygon" ? "Fechar poligono" : "Salvar linha"}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
-              <div>ID: <span className="font-semibold text-foreground">{nextCode(activeMode)}</span></div>
-              <div>Tipo: <span className="font-semibold text-foreground">{selectedType}</span></div>
-            </div>
-            <div>
-              <label className="text-[11px] font-medium">Nome descritivo</label>
-              <Input value={namingForm.name} onChange={(e) => setNamingForm((f) => ({ ...f, name: e.target.value }))} className="h-9" placeholder="Opcional" />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium">Descricao</label>
-              <Textarea value={namingForm.description} onChange={(e) => setNamingForm((f) => ({ ...f, description: e.target.value }))} rows={3} />
-            </div>
-            {activeMode === "polygon" && draft.length >= 3 && <div className="text-xs text-muted-foreground">Area estimada: {formatArea(polygonAreaMeters(draft.map((v) => [v.lng, v.lat])))}</div>}
+      <Dialog open={customTypeOpen} onOpenChange={setCustomTypeOpen}>
+        <DialogContent className="top-4 translate-y-0 max-w-sm p-4 sm:top-[50%] sm:translate-y-[-50%]">
+          <DialogHeader><DialogTitle>Novo padrao</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <label className="text-[11px] font-medium">Nome do padrao</label>
+            <Input value={customTypeName} onChange={(e) => setCustomTypeName(e.target.value)} className="h-9" placeholder="Ex.: Caixa separadora, vala de contencao" />
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setNamingOpen(false)}>Cancelar</Button>
-            <Button onClick={commitDraft}>Salvar</Button>
+            <Button variant="ghost" onClick={() => setCustomTypeOpen(false)}>Cancelar</Button>
+            <Button onClick={saveCustomType}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="top-4 translate-y-0 max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:top-[50%] sm:translate-y-[-50%]">
-          <DialogHeader><DialogTitle>Editar geometria</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editOpen === "description" ? "Adicionar descricao" : "Adicionar nome"}</DialogTitle></DialogHeader>
           {editing && (
             <div className="space-y-3">
               <div className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
                 <div>ID: <span className="font-semibold text-foreground">{geometryCode(editing, geometries.filter((g) => g.kind === editing.kind).findIndex((g) => g.id === editing.id))}</span></div>
-                <div>Tipo: <span className="font-semibold text-foreground">{KIND_LABEL[editing.kind]}</span></div>
+                <div>Padrao: <span className="font-semibold text-foreground">{descriptiveName(editing, geometryCode(editing, 0)) || KIND_LABEL[editing.kind]}</span></div>
                 {editing.kind === "point" && <div>Decimal: <span className="font-mono text-foreground">{decimalPoint(editing)}</span></div>}
                 {editing.kind === "point" && <div>GMS: <span className="font-mono text-foreground">{pointDms(editing)}</span></div>}
                 {editing.accuracy != null && <div>Precisao: <span className="text-foreground">+/-{Math.round(editing.accuracy)}m</span></div>}
                 {(editing.captured_at || editing.created_at) && <div>Data/hora: <span className="text-foreground">{formatDateTime(editing.captured_at || editing.created_at)}</span></div>}
               </div>
-              <div>
-                <label className="text-[11px] font-medium">Nome descritivo</label>
-                <Input value={namingForm.name} onChange={(e) => setNamingForm((f) => ({ ...f, name: e.target.value }))} className="h-9" placeholder="Ex.: Poco, Lagoa, Central de residuos" />
-              </div>
-              <div>
-                <label className="text-[11px] font-medium">Descricao</label>
-                <Textarea value={namingForm.description} onChange={(e) => setNamingForm((f) => ({ ...f, description: e.target.value }))} rows={3} />
-              </div>
+              {editOpen === "description" ? (
+                <div>
+                  <label className="text-[11px] font-medium">Descricao</label>
+                  <Textarea value={editValue} onChange={(e) => setEditValue(e.target.value)} rows={3} />
+                </div>
+              ) : (
+                <div>
+                  <label className="text-[11px] font-medium">Nome complementar</label>
+                  <Input value={editValue} onChange={(e) => setEditValue(e.target.value)} className="h-9" placeholder="Ex.: proximo ao reservatorio" />
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>

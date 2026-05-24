@@ -7,6 +7,8 @@ export interface SurveyGeometry {
   code?: string;
   /** Standard library type chosen during capture, such as Poco or Linha de drenagem. */
   typeLabel?: string;
+  /** Optional user label added after capture, without replacing the fixed code/type label. */
+  customName?: string;
   name: string;
   description?: string;
   /** GeoJSON Geometry object: Point | LineString | Polygon (coords [lng,lat]) */

@@ -18,8 +18,17 @@ const QUALITY_LABEL: Record<string, string> = {
 };
 
 function placemarkXml(g: SurveyGeometry): string {
-  const name = escapeXml(g.name || (g.kind === "polygon" ? "Polígono" : g.kind === "line" ? "Linha" : "Ponto"));
+  const code = g.code || "";
+  const standard = g.typeLabel && g.typeLabel !== "Outro" ? g.typeLabel : "";
+  const extra = g.customName || "";
+  const fallback = g.name || (g.kind === "polygon" ? "Polígono" : g.kind === "line" ? "Linha" : "Ponto");
+  const displayName = [code, [standard || fallback, extra].filter(Boolean).join(" - ")].filter(Boolean).join(" - ");
+  const name = escapeXml(displayName);
   const descParts: string[] = [];
+  if (code) descParts.push(`ID: ${code}`);
+  if (g.typeLabel) descParts.push(`Tipo: ${g.typeLabel}`);
+  if (g.name) descParts.push(`Nome base: ${g.name}`);
+  if (g.customName) descParts.push(`Nome complementar: ${g.customName}`);
   if (g.description) descParts.push(g.description);
   if (g.area_m2 != null) descParts.push(`Área: ${Math.round(g.area_m2)} m² (${(g.area_m2 / 10000).toFixed(3)} ha)`);
   if (g.length_m != null) descParts.push(`Comprimento: ${Math.round(g.length_m)} m`);

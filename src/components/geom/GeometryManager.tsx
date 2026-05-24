@@ -12,6 +12,7 @@ import { polygonAreaMeters, lineLengthMeters, formatArea, formatLength } from "@
 import { newGeometryId, type GeometryKind, type SurveyGeometry } from "@/lib/geometryTypes";
 
 const MapView = lazy(() => import("./MapView").then((m) => ({ default: m.MapView })));
+const FullscreenGeometryMap = lazy(() => import("./FullscreenGeometryMap").then((m) => ({ default: m.FullscreenGeometryMap })));
 const loadKml = () => import("@/lib/kmlExport");
 const exportKml = (name: string, geoms: SurveyGeometry[]) => loadKml().then((m) => m.downloadKml(name, geoms));
 const exportKmz = (name: string, geoms: SurveyGeometry[]) => loadKml().then((m) => m.downloadKmz(name, geoms));
@@ -144,6 +145,7 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
   const [draft, setDraft] = useState<DraftVertex[]>([]);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [editOpen, setEditOpen] = useState<"name" | "description" | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editing, setEditing] = useState<SurveyGeometry | null>(null);
@@ -176,6 +178,14 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
   };
 
   const libraryForMode = [...GEOMETRY_TYPE_LIBRARY[activeMode], ...customTypes[activeMode]];
+  const typeLibrary = useMemo(
+    () => ({
+      point: [...GEOMETRY_TYPE_LIBRARY.point, ...customTypes.point],
+      line: [...GEOMETRY_TYPE_LIBRARY.line, ...customTypes.line],
+      polygon: [...GEOMETRY_TYPE_LIBRARY.polygon, ...customTypes.polygon],
+    }),
+    [customTypes],
+  );
 
   const beginCapture = (typeLabel: string) => {
     if (!("geolocation" in navigator)) {
@@ -330,6 +340,16 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
         )}
       </div>
 
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setFullscreenOpen(true)}
+        disabled={disabled}
+        className="h-10 w-full justify-center"
+      >
+        <MapIcon className="h-4 w-4 mr-2" /> Adicionar no mapa
+      </Button>
+
       {(activeMode === "polygon" || activeMode === "line") && draft.length > 0 && (
         <div className="rounded-lg border border-warn/40 bg-warn-soft p-2 space-y-2">
           <div className="flex items-center justify-between text-xs gap-2">
@@ -424,6 +444,26 @@ export function GeometryManager({ value, onChange, only, exportName = "geometria
       })}
 
       <GpsCaptureDialog open={captureOpen} onOpenChange={setCaptureOpen} onSave={handleCaptured} />
+
+      {fullscreenOpen && (
+        <Suspense fallback={null}>
+          <FullscreenGeometryMap
+            open={fullscreenOpen}
+            onOpenChange={setFullscreenOpen}
+            geometries={visibleGeoms}
+            onSave={(next) => {
+              if (only) {
+                const rest = geometries.filter((g) => g.kind !== only);
+                onChange([...rest, ...next.filter((g) => g.kind === only)]);
+              } else {
+                onChange(next);
+              }
+            }}
+            typeLibrary={typeLibrary}
+            only={only}
+          />
+        </Suspense>
+      )}
 
       <Dialog open={typePickerOpen} onOpenChange={setTypePickerOpen}>
         <DialogContent className="top-4 translate-y-0 max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto p-4 sm:top-[50%] sm:translate-y-[-50%]">

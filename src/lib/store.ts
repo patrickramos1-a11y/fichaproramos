@@ -4,7 +4,7 @@ import type {
   SurveyType, Attachment, SurveyTemplate,
   FormStructureOverrides, FieldPatch, SubgroupPatch, ModulePatch, SubgroupDef, FieldDef,
   CustomSurveyType, CustomTypeModuleBinding, ModuleRequirement,
-  PhotoChecklistAnswer, SurveyPurpose,
+  PhotoChecklistAnswer, SurveyPurpose, AnnualEnvironmentalRecord,
 } from "./types";
 import {
   getModulesForType, ensureLegacyAdapters, getEffectiveModulesForType,
@@ -20,6 +20,7 @@ import {
   OBRA_AMBIENTAL_TYPE_ID,
 } from "./surveyTypeIds";
 import { defaultTemplateKeyFor, photoScopedOverridesForTemplate } from "./photoChecklists";
+import { normalizeAnnualEnvironmentalRecord } from "./annualEnvironmental";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { saveSnapshot, loadSnapshot, clearSnapshot } from "./offlineSnapshot";
@@ -32,6 +33,7 @@ interface DB {
   templates: SurveyTemplate[];
   formOverrides: FormStructureOverrides;
   customSurveyTypes: CustomSurveyType[];
+  annualRecords: AnnualEnvironmentalRecord[];
 }
 
 interface DBStatus {
@@ -57,7 +59,7 @@ interface StoreRuntime {
 
 const EMPTY_DB: DB = {
   clients: [], empreendimentos: [], projects: [], surveys: [],
-  templates: [], formOverrides: {}, customSurveyTypes: [],
+  templates: [], formOverrides: {}, customSurveyTypes: [], annualRecords: [],
 };
 
 function createModuleState(): ModuleState {
@@ -168,6 +170,9 @@ function normalizeDB(raw: Partial<DB> | null | undefined): DB {
     customSurveyTypes: Array.isArray(raw?.customSurveyTypes)
       ? raw!.customSurveyTypes!.map((type) => normalizeCustomSurveyType(type))
       : [],
+    annualRecords: Array.isArray(raw?.annualRecords)
+      ? raw!.annualRecords!.map((record) => normalizeAnnualEnvironmentalRecord(record))
+      : [],
   };
 }
 
@@ -216,7 +221,14 @@ function syncGlobalOverrides() {
 
 /* =================== Supabase sync =================== */
 
-type TableName = "clients" | "empreendimentos" | "projects" | "surveys" | "survey_templates" | "custom_survey_types";
+type TableName =
+  | "clients"
+  | "empreendimentos"
+  | "projects"
+  | "surveys"
+  | "survey_templates"
+  | "custom_survey_types"
+  | "annual_environmental_records";
 
 function rowFor(table: TableName, item: any): Record<string, any> {
   switch (table) {
@@ -226,6 +238,7 @@ function rowFor(table: TableName, item: any): Record<string, any> {
     case "surveys": return { id: item.id, project_id: item.projectId ?? `client:${item.clientId ?? "direct"}`, data: item };
     case "survey_templates": return { id: item.id, data: item };
     case "custom_survey_types": return { id: item.id, data: item };
+    case "annual_environmental_records": return { id: item.id, client_id: item.clientId, data: item };
   }
 }
 
@@ -266,6 +279,7 @@ async function flushSync() {
       diffTable("surveys", before.surveys, after.surveys),
       diffTable("survey_templates", before.templates, after.templates),
       diffTable("custom_survey_types", before.customSurveyTypes, after.customSurveyTypes),
+      diffTable("annual_environmental_records", before.annualRecords, after.annualRecords),
     ]);
     if (before.formOverrides !== after.formOverrides) {
       const { error } = await supabase.from("form_overrides").upsert({ id: "singleton", data: after.formOverrides as any });
@@ -331,7 +345,11 @@ function applyRealtimeChange(table: TableName | "form_overrides", payload: any) 
       const arr = next[key] as any[];
       if (event === "DELETE") next[key] = removeItem(arr as any, id) as any;
       else if (item) {
-        const value = key === "surveys" ? normalizeSurvey(item) : item;
+        const value = key === "surveys"
+          ? normalizeSurvey(item)
+          : key === "annualRecords"
+            ? normalizeAnnualEnvironmentalRecord(item)
+            : item;
         next[key] = upsertItem(arr as any, value) as any;
       }
     };
@@ -342,6 +360,7 @@ function applyRealtimeChange(table: TableName | "form_overrides", payload: any) 
       case "surveys": apply("surveys"); break;
       case "survey_templates": apply("templates"); break;
       case "custom_survey_types": apply("customSurveyTypes"); break;
+      case "annual_environmental_records": apply("annualRecords"); break;
     }
   }
 
@@ -356,7 +375,7 @@ function subscribeRealtime() {
   const ch = supabase.channel("workspace");
   const tables: (TableName | "form_overrides")[] = [
     "clients", "empreendimentos", "projects", "surveys",
-    "survey_templates", "custom_survey_types", "form_overrides",
+    "survey_templates", "custom_survey_types", "annual_environmental_records", "form_overrides",
   ];
   for (const t of tables) {
     ch.on("postgres_changes", { event: "*", schema: "public", table: t }, (payload) => {
@@ -377,13 +396,14 @@ function unsubscribeRealtime() {
 /* =================== Initial load =================== */
 
 async function fetchAll(): Promise<DB> {
-  const [clients, emp, projects, surveys, templates, custom, fo] = await Promise.all([
+  const [clients, emp, projects, surveys, templates, custom, annual, fo] = await Promise.all([
     supabase.from("clients").select("data"),
     supabase.from("empreendimentos").select("data"),
     supabase.from("projects").select("data"),
     supabase.from("surveys").select("data"),
     supabase.from("survey_templates").select("data"),
     supabase.from("custom_survey_types").select("data"),
+    supabase.from("annual_environmental_records").select("data"),
     supabase.from("form_overrides").select("data").eq("id", "singleton").maybeSingle(),
   ]);
   return normalizeDB({
@@ -393,6 +413,7 @@ async function fetchAll(): Promise<DB> {
     surveys: (surveys.data ?? []).map((r: any) => r.data),
     templates: (templates.data ?? []).map((r: any) => r.data),
     customSurveyTypes: (custom.data ?? []).map((r: any) => r.data),
+    annualRecords: (annual.data ?? []).map((r: any) => r.data),
     formOverrides: (fo.data?.data ?? {}) as FormStructureOverrides,
   });
 }
@@ -646,6 +667,7 @@ export function deleteClient(cid: string) {
     clients: store.db.clients.filter((client) => client.id !== cid),
     empreendimentos: store.db.empreendimentos.filter((empreendimento) => empreendimento.clientId !== cid),
     projects: remainingProjects,
+    annualRecords: store.db.annualRecords.filter((record) => record.clientId !== cid),
     surveys: store.db.surveys.filter((survey) => {
       if (survey.clientId === cid) return false;
       return survey.projectId ? remainingProjectIds.has(survey.projectId) : true;
@@ -923,6 +945,33 @@ export function deleteSurvey(sid: string) {
   persist();
 }
 
+export function addAnnualEnvironmentalRecord(record: AnnualEnvironmentalRecord) {
+  const normalized = normalizeAnnualEnvironmentalRecord(record);
+  store.db = { ...store.db, annualRecords: [normalized, ...store.db.annualRecords] };
+  persist();
+  return normalized;
+}
+
+export function updateAnnualEnvironmentalRecord(recordId: string, data: Partial<AnnualEnvironmentalRecord>) {
+  store.db = {
+    ...store.db,
+    annualRecords: store.db.annualRecords.map((record) =>
+      record.id === recordId
+        ? normalizeAnnualEnvironmentalRecord({ ...record, ...data, updatedAt: new Date().toISOString() })
+        : record,
+    ),
+  };
+  persist();
+}
+
+export function deleteAnnualEnvironmentalRecord(recordId: string) {
+  store.db = {
+    ...store.db,
+    annualRecords: store.db.annualRecords.filter((record) => record.id !== recordId),
+  };
+  persist();
+}
+
 /** Exclui múltiplos levantamentos de uma vez (Fase 4). */
 export function bulkDeleteSurveys(sids: string[]) {
   if (!sids.length) return;
@@ -938,6 +987,7 @@ export function resetOperationalData() {
     empreendimentos: [],
     projects: [],
     surveys: [],
+    annualRecords: [],
   };
   if (store.userId) {
     idle(() => void clearSnapshot());

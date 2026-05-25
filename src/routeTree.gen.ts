@@ -23,6 +23,7 @@ import { Route as ClientesIdRouteImport } from './routes/clientes.$id'
 import { Route as LevantamentosIdIndexRouteImport } from './routes/levantamentos.$id.index'
 import { Route as LevantamentosIdResumoRouteImport } from './routes/levantamentos.$id.resumo'
 import { Route as ConfiguracoesTiposTypeIdRouteImport } from './routes/configuracoes.tipos.$typeId'
+import { Route as ClientesIdDadosAmbientaisRecordIdRouteImport } from './routes/clientes.$id.dados-ambientais.$recordId'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -95,13 +96,19 @@ const ConfiguracoesTiposTypeIdRoute =
     path: '/tipos/$typeId',
     getParentRoute: () => ConfiguracoesRoute,
   } as any)
+const ClientesIdDadosAmbientaisRecordIdRoute =
+  ClientesIdDadosAmbientaisRecordIdRouteImport.update({
+    id: '/dados-ambientais/$recordId',
+    path: '/dados-ambientais/$recordId',
+    getParentRoute: () => ClientesIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/configuracoes': typeof ConfiguracoesRouteWithChildren
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/clientes/$id': typeof ClientesIdRoute
+  '/clientes/$id': typeof ClientesIdRouteWithChildren
   '/levantamentos/novo': typeof LevantamentosNovoRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/clientes/': typeof ClientesIndexRoute
@@ -111,12 +118,13 @@ export interface FileRoutesByFullPath {
   '/configuracoes/tipos/$typeId': typeof ConfiguracoesTiposTypeIdRoute
   '/levantamentos/$id/resumo': typeof LevantamentosIdResumoRoute
   '/levantamentos/$id/': typeof LevantamentosIdIndexRoute
+  '/clientes/$id/dados-ambientais/$recordId': typeof ClientesIdDadosAmbientaisRecordIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/clientes/$id': typeof ClientesIdRoute
+  '/clientes/$id': typeof ClientesIdRouteWithChildren
   '/levantamentos/novo': typeof LevantamentosNovoRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/clientes': typeof ClientesIndexRoute
@@ -126,6 +134,7 @@ export interface FileRoutesByTo {
   '/configuracoes/tipos/$typeId': typeof ConfiguracoesTiposTypeIdRoute
   '/levantamentos/$id/resumo': typeof LevantamentosIdResumoRoute
   '/levantamentos/$id': typeof LevantamentosIdIndexRoute
+  '/clientes/$id/dados-ambientais/$recordId': typeof ClientesIdDadosAmbientaisRecordIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -133,7 +142,7 @@ export interface FileRoutesById {
   '/configuracoes': typeof ConfiguracoesRouteWithChildren
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
-  '/clientes/$id': typeof ClientesIdRoute
+  '/clientes/$id': typeof ClientesIdRouteWithChildren
   '/levantamentos/novo': typeof LevantamentosNovoRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/clientes/': typeof ClientesIndexRoute
@@ -143,6 +152,7 @@ export interface FileRoutesById {
   '/configuracoes/tipos/$typeId': typeof ConfiguracoesTiposTypeIdRoute
   '/levantamentos/$id/resumo': typeof LevantamentosIdResumoRoute
   '/levantamentos/$id/': typeof LevantamentosIdIndexRoute
+  '/clientes/$id/dados-ambientais/$recordId': typeof ClientesIdDadosAmbientaisRecordIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/configuracoes/tipos/$typeId'
     | '/levantamentos/$id/resumo'
     | '/levantamentos/$id/'
+    | '/clientes/$id/dados-ambientais/$recordId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/configuracoes/tipos/$typeId'
     | '/levantamentos/$id/resumo'
     | '/levantamentos/$id'
+    | '/clientes/$id/dados-ambientais/$recordId'
   id:
     | '__root__'
     | '/'
@@ -192,6 +204,7 @@ export interface FileRouteTypes {
     | '/configuracoes/tipos/$typeId'
     | '/levantamentos/$id/resumo'
     | '/levantamentos/$id/'
+    | '/clientes/$id/dados-ambientais/$recordId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -199,7 +212,7 @@ export interface RootRouteChildren {
   ConfiguracoesRoute: typeof ConfiguracoesRouteWithChildren
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
-  ClientesIdRoute: typeof ClientesIdRoute
+  ClientesIdRoute: typeof ClientesIdRouteWithChildren
   LevantamentosNovoRoute: typeof LevantamentosNovoRoute
   ProjetosIdRoute: typeof ProjetosIdRoute
   ClientesIndexRoute: typeof ClientesIndexRoute
@@ -309,6 +322,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConfiguracoesTiposTypeIdRouteImport
       parentRoute: typeof ConfiguracoesRoute
     }
+    '/clientes/$id/dados-ambientais/$recordId': {
+      id: '/clientes/$id/dados-ambientais/$recordId'
+      path: '/dados-ambientais/$recordId'
+      fullPath: '/clientes/$id/dados-ambientais/$recordId'
+      preLoaderRoute: typeof ClientesIdDadosAmbientaisRecordIdRouteImport
+      parentRoute: typeof ClientesIdRoute
+    }
   }
 }
 
@@ -326,12 +346,25 @@ const ConfiguracoesRouteWithChildren = ConfiguracoesRoute._addFileChildren(
   ConfiguracoesRouteChildren,
 )
 
+interface ClientesIdRouteChildren {
+  ClientesIdDadosAmbientaisRecordIdRoute: typeof ClientesIdDadosAmbientaisRecordIdRoute
+}
+
+const ClientesIdRouteChildren: ClientesIdRouteChildren = {
+  ClientesIdDadosAmbientaisRecordIdRoute:
+    ClientesIdDadosAmbientaisRecordIdRoute,
+}
+
+const ClientesIdRouteWithChildren = ClientesIdRoute._addFileChildren(
+  ClientesIdRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConfiguracoesRoute: ConfiguracoesRouteWithChildren,
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
-  ClientesIdRoute: ClientesIdRoute,
+  ClientesIdRoute: ClientesIdRouteWithChildren,
   LevantamentosNovoRoute: LevantamentosNovoRoute,
   ProjetosIdRoute: ProjetosIdRoute,
   ClientesIndexRoute: ClientesIndexRoute,

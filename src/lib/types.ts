@@ -392,6 +392,265 @@ export interface Survey {
   realizadoPor?: string;
 }
 
+/* ============ Dados ambientais anuais / Gestao RAPP-RIAA ============ */
+
+export const ANNUAL_MONTH_KEYS = [
+  "jan",
+  "fev",
+  "mar",
+  "abr",
+  "mai",
+  "jun",
+  "jul",
+  "ago",
+  "set",
+  "out",
+  "nov",
+  "dez",
+] as const;
+
+export type AnnualMonthKey = typeof ANNUAL_MONTH_KEYS[number];
+
+export type AnnualRecordStatus =
+  | "nao_iniciado"
+  | "solicitacao_enviada"
+  | "aguardando_cliente"
+  | "recebido_parcialmente"
+  | "em_conferencia"
+  | "pendente_complementacao"
+  | "consolidado"
+  | "finalizado";
+
+export type AnnualDataStatus =
+  | "pendente"
+  | "recebido"
+  | "em_conferencia"
+  | "validado"
+  | "desconsiderado"
+  | "substituido"
+  | "nao_se_aplica";
+
+export type AnnualValidationState =
+  | "novo"
+  | "mantido"
+  | "alterado"
+  | "removido"
+  | "pendente_confirmacao";
+
+export type AnnualPendingStatus =
+  | "em_aberto"
+  | "solicitado_cliente"
+  | "recebido"
+  | "em_conferencia"
+  | "resolvido"
+  | "nao_se_aplica";
+
+export type AnnualRecordSectionKey =
+  | "identification"
+  | "units"
+  | "operationalData"
+  | "energy"
+  | "rawMaterials"
+  | "products"
+  | "residues"
+  | "inputs"
+  | "staffAndSchedules"
+  | "vehicles"
+  | "waterEffluents"
+  | "analyses"
+  | "documents"
+  | "pendingItems"
+  | "consolidation";
+
+export type AnnualMonthlyValues = Partial<Record<AnnualMonthKey, number | null>>;
+export type AnnualMonthlyDocumentRefs = Partial<Record<AnnualMonthKey, string[]>>;
+
+export interface AnnualEnvironmentalUnit {
+  id: string;
+  name: string;
+  empreendimentoId?: string;
+  cidade?: string;
+  uf?: string;
+  notes?: string;
+  active?: boolean;
+}
+
+export interface AnnualRecordIdentification {
+  periodStart?: string;
+  periodEnd?: string;
+  responsibleInternal?: string;
+  responsibleClient?: string;
+  requestDate?: string;
+  receivedDate?: string;
+  observations?: string;
+}
+
+export interface AnnualOperationalPeriod {
+  id: string;
+  unitId?: string;
+  activity?: string;
+  startMonth?: AnnualMonthKey;
+  endMonth?: AnnualMonthKey;
+  staffCount?: number | null;
+  schedule?: string;
+  workingDays?: string;
+  shifts?: string;
+  status?: AnnualDataStatus;
+  observation?: string;
+}
+
+export interface AnnualEnergyRow {
+  id: string;
+  unitId?: string;
+  monthly: AnnualMonthlyValues;
+  documentIds?: AnnualMonthlyDocumentRefs;
+  status?: AnnualDataStatus;
+  observation?: string;
+}
+
+export interface AnnualEnergySection {
+  rows: AnnualEnergyRow[];
+}
+
+export interface AnnualLineItem {
+  id: string;
+  name: string;
+  category?: string;
+  unit?: string;
+  unitId?: string;
+  monthly: AnnualMonthlyValues;
+  documentIds?: AnnualMonthlyDocumentRefs;
+  annualTotal?: number | null;
+  status?: AnnualDataStatus;
+  validationState?: AnnualValidationState;
+  originRecordId?: string;
+  destination?: string;
+  collector?: string;
+  classification?: string;
+  observation?: string;
+}
+
+export interface AnnualLineItemsSection {
+  items: AnnualLineItem[];
+}
+
+export interface AnnualStaffSchedulePeriod {
+  id: string;
+  unitId?: string;
+  startMonth?: AnnualMonthKey;
+  endMonth?: AnnualMonthKey;
+  staffCount?: number | null;
+  schedule?: string;
+  observation?: string;
+  status?: AnnualDataStatus;
+}
+
+export interface AnnualVehicle {
+  id: string;
+  model?: string;
+  plate?: string;
+  year?: string;
+  fuel?: string;
+  situation?: string;
+  documentId?: string;
+  status?: AnnualDataStatus;
+  validationState?: AnnualValidationState;
+  observation?: string;
+}
+
+export interface AnnualWaterEffluentEntry {
+  id: string;
+  unitId?: string;
+  waterConsumption?: number | null;
+  waterUnit?: string;
+  waterOrigin?: string;
+  effluentVolume?: number | null;
+  treatmentSystem?: string;
+  efficiency?: string;
+  linkedAnalysisIds?: string[];
+  status?: AnnualDataStatus;
+  observation?: string;
+}
+
+export interface AnnualAnalysis {
+  id: string;
+  unitId?: string;
+  type?: string;
+  date?: string;
+  laboratory?: string;
+  validity?: string;
+  generalResult?: string;
+  documentId?: string;
+  nextRecommendedAnalysis?: string;
+  status?: AnnualDataStatus;
+  validationState?: AnnualValidationState;
+  observation?: string;
+}
+
+export interface AnnualDocument extends Attachment {
+  section?: AnnualRecordSectionKey;
+  unitId?: string;
+  itemId?: string;
+  status?: AnnualDataStatus;
+  observation?: string;
+  replacedByDocumentId?: string;
+}
+
+export interface AnnualPendingItem {
+  id: string;
+  description: string;
+  section?: AnnualRecordSectionKey;
+  unitId?: string;
+  itemId?: string;
+  documentId?: string;
+  responsible?: string;
+  dueDate?: string;
+  status: AnnualPendingStatus;
+  observation?: string;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface AnnualConsolidation {
+  technicalSummary?: string;
+  clientRequestText?: string;
+  aiSummaryText?: string;
+  exportedAt?: string;
+}
+
+export interface AnnualComparisonSummary {
+  label: string;
+  currentTotal?: number | null;
+  previousTotal?: number | null;
+  variationPercent?: number | null;
+  status: "aumentou" | "diminuiu" | "manteve" | "novo" | "removido" | "pendente";
+}
+
+export interface AnnualEnvironmentalRecord {
+  id: string;
+  clientId: string;
+  yearBase: number;
+  previousRecordId?: string;
+  status: AnnualRecordStatus;
+  units: AnnualEnvironmentalUnit[];
+  identification: AnnualRecordIdentification;
+  operationalData: { periods: AnnualOperationalPeriod[] };
+  energy: AnnualEnergySection;
+  rawMaterials: AnnualLineItemsSection;
+  products: AnnualLineItemsSection;
+  residues: AnnualLineItemsSection;
+  inputs: AnnualLineItemsSection;
+  staffAndSchedules: { periods: AnnualStaffSchedulePeriod[] };
+  vehicles: { items: AnnualVehicle[] };
+  waterEffluents: { entries: AnnualWaterEffluentEntry[]; applicable?: boolean };
+  analyses: { items: AnnualAnalysis[] };
+  documents: AnnualDocument[];
+  pendingItems: AnnualPendingItem[];
+  consolidation: AnnualConsolidation;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Template de configuração de módulos (reutilizável entre levantamentos). */
 export interface SurveyTemplate {
   id: string;

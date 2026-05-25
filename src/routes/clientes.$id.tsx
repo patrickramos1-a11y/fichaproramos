@@ -9,6 +9,8 @@ import {
   addEmpreendimento,
   deleteEmpreendimento,
   updateClient,
+  addAnnualEnvironmentalRecord,
+  deleteAnnualEnvironmentalRecord,
 } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +25,28 @@ import { ClienteForm, emptyClienteForm, type ClienteFormValue } from "@/componen
 import { PurposeChips } from "@/components/FinalidadeCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getSurveyEmpreendimento, getSurveyProject, getSurveysForClient } from "@/lib/surveyRelations";
-import { ALL_SURVEY_PURPOSES, SURVEY_PURPOSE_LABELS, type Attachment, type Pendencia, type Survey, type SurveyPurpose } from "@/lib/types";
+import {
+  ALL_SURVEY_PURPOSES,
+  SURVEY_PURPOSE_LABELS,
+  type AnnualEnvironmentalRecord,
+  type Attachment,
+  type Client,
+  type Empreendimento,
+  type Pendencia,
+  type Survey,
+  type SurveyPurpose,
+} from "@/lib/types";
+import {
+  ANNUAL_STATUS_LABELS,
+  buildAnnualAISummary,
+  buildAnnualClientRequestText,
+  calculateAnnualProgress,
+  countAnnualOpenPending,
+  countAnnualValidDocuments,
+  createAnnualRecordFromPrevious,
+  createAnnualUnitsFromEmpreendimentos,
+  createEmptyAnnualEnvironmentalRecord,
+} from "@/lib/annualEnvironmental";
 import {
   Plus,
   Trash2,
@@ -40,6 +63,8 @@ import {
   MapPin,
   ChevronRight,
   UserRound,
+  CalendarDays,
+  Database,
 } from "lucide-react";
 
 export const Route = createFileRoute("/clientes/$id")({
@@ -73,6 +98,9 @@ function ClienteDetail() {
   const empreendimentos = db.empreendimentos.filter((e) => e.clientId === id);
   const projects = db.projects.filter((p) => p.clientId === id);
   const surveys = getSurveysForClient(db.surveys, id, db.projects);
+  const annualRecords = db.annualRecords
+    .filter((record) => record.clientId === id)
+    .sort((a, b) => b.yearBase - a.yearBase);
   const [projectOpen, setProjectOpen] = useState(false);
   const [projectForm, setProjectForm] = useState({ name: "", description: "", empreendimentoId: "" });
   const [empOpen, setEmpOpen] = useState(false);
@@ -131,6 +159,7 @@ function ClienteDetail() {
   const closedRows = surveyRows.filter((row) => !!row.survey.closedAt);
   const latestSurvey = surveyRows[0];
   const totalPendencias = surveyRows.reduce((acc, row) => acc + row.pending.length, 0);
+  const annualOpenPendencies = annualRecords.reduce((acc, record) => acc + countAnnualOpenPending(record), 0);
   const allDocs = surveyRows.flatMap((row) => row.attachments).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const availablePurposes = ALL_SURVEY_PURPOSES.filter((purpose) =>
     surveyRows.some((row) => (row.survey.purposes ?? []).includes(purpose)),
@@ -167,7 +196,7 @@ function ClienteDetail() {
     ? availablePurposes.map((purpose) => SURVEY_PURPOSE_LABELS[purpose]).join(", ")
     : "sem finalidades classificadas";
 
-  const summaryText = `Este cliente possui dados para ${purposeSentence}. ${latestSurvey ? `O ultimo levantamento foi em ${formatDate(latestSurvey.dateBase)}.` : "Ainda nao existem levantamentos registrados."} Existem ${openRows.length} levantamento(s) em andamento, ${closedRows.length} concluido(s) e ${totalPendencias} pendencia(s) aberta(s).`;
+  const summaryText = `Este cliente possui dados para ${purposeSentence}. ${latestSurvey ? `O ultimo levantamento foi em ${formatDate(latestSurvey.dateBase)}.` : "Ainda nao existem levantamentos registrados."} Existem ${openRows.length} levantamento(s) em andamento, ${closedRows.length} concluido(s), ${totalPendencias} pendencia(s) de levantamento e ${annualOpenPendencies} pendencia(s) em dados ambientais anuais.`;
 
   const pendingRows = surveyRows.flatMap((row) =>
     row.pending.map((pendencia) => ({
@@ -247,6 +276,7 @@ function ClienteDetail() {
             <MiniInfo label="Em andamento" value={String(openRows.length)} tone="warn" />
             <MiniInfo label="Concluidos" value={String(closedRows.length)} tone="ok" />
             <MiniInfo label="Pendencias" value={String(totalPendencias)} tone="danger" />
+            <MiniInfo label="Anos ambientais" value={String(annualRecords.length)} />
             <MiniInfo label="Ultimo" value={latestSurvey ? formatDate(latestSurvey.dateBase) : "—"} />
           </div>
 
@@ -279,12 +309,13 @@ function ClienteDetail() {
         </div>
       </div>
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <KpiCard label="Total de levantamentos" value={surveyRows.length} icon={<ClipboardList className="h-4 w-4" />} />
         <KpiCard label="Em andamento" value={openRows.length} icon={<Clock3 className="h-4 w-4" />} tone="warn" />
         <KpiCard label="Concluidos" value={closedRows.length} icon={<CheckCircle2 className="h-4 w-4" />} tone="ok" />
         <KpiCard label="Pendencias abertas" value={totalPendencias} icon={<AlertTriangle className="h-4 w-4" />} tone="danger" />
         <KpiCard label="Documentos e fotos" value={allDocs.length} icon={<Files className="h-4 w-4" />} />
+        <KpiCard label="Dados anuais" value={annualRecords.length} icon={<Database className="h-4 w-4" />} />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -292,6 +323,7 @@ function ClienteDetail() {
           <TabsTrigger value="geral">Visao Geral</TabsTrigger>
           <TabsTrigger value="levantamentos">Levantamentos</TabsTrigger>
           <TabsTrigger value="finalidades">Finalidades</TabsTrigger>
+          <TabsTrigger value="dados-ambientais">Dados Ambientais Anuais</TabsTrigger>
           <TabsTrigger value="pendencias">Pendencias</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="cadastro">Dados cadastrais</TabsTrigger>
@@ -439,6 +471,10 @@ function ClienteDetail() {
               </CardContent>
             </Card>
           ))}
+        </TabsContent>
+
+        <TabsContent value="dados-ambientais" className="space-y-4">
+          <AnnualRecordsPanel client={client} empreendimentos={empreendimentos} records={annualRecords} />
         </TabsContent>
 
         <TabsContent value="pendencias" className="space-y-3">
@@ -645,6 +681,136 @@ function ClienteDetail() {
         </DialogContent>
       </Dialog>
     </AppShell>
+  );
+}
+
+function AnnualRecordsPanel({
+  client,
+  empreendimentos,
+  records,
+}: {
+  client: Client;
+  empreendimentos: Empreendimento[];
+  records: AnnualEnvironmentalRecord[];
+}) {
+  const nav = useNavigate();
+  const suggestedYear = String(new Date().getFullYear() - 1);
+  const [year, setYear] = useState(suggestedYear);
+  const latest = records[0];
+
+  function createBlank() {
+    const yearBase = Number(year);
+    if (!Number.isFinite(yearBase) || yearBase < 2000) return;
+    const record = addAnnualEnvironmentalRecord(createEmptyAnnualEnvironmentalRecord({
+      clientId: client.id,
+      yearBase,
+      units: createAnnualUnitsFromEmpreendimentos(empreendimentos),
+    }));
+    nav({ to: "/clientes/$id/dados-ambientais/$recordId", params: { id: client.id, recordId: record.id } });
+  }
+
+  function createFromPrevious() {
+    const yearBase = Number(year);
+    if (!latest || !Number.isFinite(yearBase) || yearBase < 2000) return;
+    const record = addAnnualEnvironmentalRecord(createAnnualRecordFromPrevious(latest, yearBase));
+    nav({ to: "/clientes/$id/dados-ambientais/$recordId", params: { id: client.id, recordId: record.id } });
+  }
+
+  async function copy(text: string) {
+    await navigator.clipboard?.writeText(text);
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <CardTitle>Dados Ambientais Anuais</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Memoria anual do cliente para RAPP, RIAA, relatorios ambientais, pendencias e processamento por IA.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={year}
+              onChange={(event) => setYear(event.target.value.replace(/\D/g, "").slice(0, 4))}
+              className="w-28"
+              placeholder="Ano"
+            />
+            <Button type="button" onClick={createBlank}>
+              <Plus className="mr-1 h-4 w-4" /> Novo ano-base
+            </Button>
+            <Button type="button" variant="outline" onClick={createFromPrevious} disabled={!latest}>
+              <CalendarDays className="mr-1 h-4 w-4" /> Base anterior
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {records.length === 0 ? (
+            <EmptyHint label="Nenhum ano-base cadastrado para este cliente. Crie o primeiro ano para iniciar a memoria ambiental anual." />
+          ) : (
+            <div className="space-y-3">
+              {records.map((record) => {
+                const progress = calculateAnnualProgress(record);
+                const pending = countAnnualOpenPending(record);
+                const docs = countAnnualValidDocuments(record);
+                const previous = records.find((entry) => entry.id === record.previousRecordId);
+                return (
+                  <Card key={record.id} className="border-border/80">
+                    <CardContent className="flex flex-col gap-4 p-4 xl:flex-row xl:items-center xl:justify-between">
+                      <div className="min-w-0 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary">Ano-base {record.yearBase}</Badge>
+                          <Badge variant="outline">{ANNUAL_STATUS_LABELS[record.status]}</Badge>
+                          {previous && <Badge variant="outline">Base {previous.yearBase}</Badge>}
+                        </div>
+                        <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-4">
+                          <Metric label="Preenchimento" value={`${progress}%`} />
+                          <Metric label="Pendencias" value={pending} />
+                          <Metric label="Documentos" value={docs} />
+                          <Metric label="Atualizado" value={formatDate(record.updatedAt)} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 sm:flex">
+                        <Link to="/clientes/$id/dados-ambientais/$recordId" params={{ id: client.id, recordId: record.id }}>
+                          <Button size="sm" className="w-full">Abrir</Button>
+                        </Link>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => copy(buildAnnualClientRequestText(record, previous, client.name))}
+                        >
+                          Solicitar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => copy(buildAnnualAISummary(record, client.name))}
+                        >
+                          IA
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            if (confirm("Excluir este ano-base ambiental?")) deleteAnnualEnvironmentalRecord(record.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

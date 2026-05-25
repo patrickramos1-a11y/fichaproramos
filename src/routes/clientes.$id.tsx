@@ -116,8 +116,6 @@ function ClienteDetail() {
   const [statusFilter, setStatusFilter] = useState<"todos" | "andamento" | "concluidos" | "pendencias">("todos");
   const [purposeFilter, setPurposeFilter] = useState<Set<SurveyPurpose>>(new Set());
 
-  if (!client) return <AppShell><p>Cliente nao encontrado.</p></AppShell>;
-
   const surveyRows = useMemo(() => {
     return surveys
       .map((survey) => {
@@ -206,6 +204,8 @@ function ClienteDetail() {
       typeMeta: row.typeMeta,
     })),
   );
+
+  if (!client) return <AppShell><p>Cliente nao encontrado.</p></AppShell>;
 
   function submitProject() {
     if (!projectForm.name.trim()) return;

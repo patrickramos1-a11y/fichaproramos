@@ -221,6 +221,8 @@ function syncGlobalOverrides() {
 
 /* =================== Supabase sync =================== */
 
+let annualRecordsRemoteUnavailable = false;
+
 type TableName =
   | "clients"
   | "empreendimentos"
@@ -406,6 +408,10 @@ async function fetchAll(): Promise<DB> {
     supabase.from("annual_environmental_records").select("data"),
     supabase.from("form_overrides").select("data").eq("id", "singleton").maybeSingle(),
   ]);
+  annualRecordsRemoteUnavailable = !!annual.error;
+  if (annual.error) {
+    console.warn("[sync] annual_environmental_records unavailable; using local snapshot fallback when possible.", annual.error);
+  }
   return normalizeDB({
     clients: (clients.data ?? []).map((r: any) => r.data),
     empreendimentos: (emp.data ?? []).map((r: any) => r.data),
@@ -424,6 +430,17 @@ async function initForUser(userId: string) {
   emit();
   try {
     const loaded = await fetchAll();
+    if (annualRecordsRemoteUnavailable) {
+      const snap = await loadSnapshot(userId);
+      const snapshotDb = normalizeDB(snap as any);
+      if (snapshotDb.annualRecords.length) {
+        loaded.annualRecords = snapshotDb.annualRecords;
+      }
+      store.status = {
+        ...store.status,
+        persistenceError: "Dados Ambientais Anuais em modo local ate a tabela do Supabase ser aplicada.",
+      };
+    }
     store.db = loaded;
     store.lastSyncedDb = loaded;
     syncGlobalOverrides();

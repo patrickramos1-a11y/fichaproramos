@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,7 +105,12 @@ function AnnualRecordPage() {
   }
 
   async function copyText(text: string) {
-    await navigator.clipboard?.writeText(text);
+    try {
+      await navigator.clipboard?.writeText(text);
+      toast.success("Texto copiado.");
+    } catch {
+      window.prompt("Copie o texto abaixo:", text);
+    }
   }
 
   function downloadJson() {
@@ -115,6 +121,7 @@ function AnnualRecordPage() {
     anchor.download = `${currentClient.name}-${currentRecord.yearBase}-dados-ambientais.json`;
     anchor.click();
     URL.revokeObjectURL(url);
+    toast.success("JSON gerado.");
   }
 
   return (

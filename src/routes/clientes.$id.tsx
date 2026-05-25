@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import {
   getSurveyTypeMeta,
@@ -698,26 +699,59 @@ function AnnualRecordsPanel({
   const [year, setYear] = useState(suggestedYear);
   const latest = records[0];
 
+  function openRecord(recordId: string) {
+    void nav({ to: "/clientes/$id/dados-ambientais/$recordId", params: { id: client.id, recordId } });
+  }
+
   function createBlank() {
     const yearBase = Number(year);
-    if (!Number.isFinite(yearBase) || yearBase < 2000) return;
+    if (!Number.isFinite(yearBase) || yearBase < 2000) {
+      toast.error("Informe um ano-base valido.");
+      return;
+    }
+    const existing = records.find((entry) => entry.yearBase === yearBase);
+    if (existing) {
+      toast.info(`Ano-base ${yearBase} ja existe. Abrindo o registro.`);
+      openRecord(existing.id);
+      return;
+    }
     const record = addAnnualEnvironmentalRecord(createEmptyAnnualEnvironmentalRecord({
       clientId: client.id,
       yearBase,
       units: createAnnualUnitsFromEmpreendimentos(empreendimentos),
     }));
-    nav({ to: "/clientes/$id/dados-ambientais/$recordId", params: { id: client.id, recordId: record.id } });
+    toast.success(`Ano-base ${yearBase} criado.`);
+    openRecord(record.id);
   }
 
   function createFromPrevious() {
     const yearBase = Number(year);
-    if (!latest || !Number.isFinite(yearBase) || yearBase < 2000) return;
+    if (!latest) {
+      toast.error("Crie primeiro um ano-base inicial.");
+      return;
+    }
+    if (!Number.isFinite(yearBase) || yearBase < 2000) {
+      toast.error("Informe um ano-base valido.");
+      return;
+    }
+    const existing = records.find((entry) => entry.yearBase === yearBase);
+    if (existing) {
+      toast.info(`Ano-base ${yearBase} ja existe. Abrindo o registro.`);
+      openRecord(existing.id);
+      return;
+    }
     const record = addAnnualEnvironmentalRecord(createAnnualRecordFromPrevious(latest, yearBase));
-    nav({ to: "/clientes/$id/dados-ambientais/$recordId", params: { id: client.id, recordId: record.id } });
+    toast.success(`Ano-base ${yearBase} criado com base em ${latest.yearBase}.`);
+    openRecord(record.id);
   }
 
-  async function copy(text: string) {
-    await navigator.clipboard?.writeText(text);
+  async function copy(text: string, label: string) {
+    try {
+      await navigator.clipboard?.writeText(text);
+      toast.success(`${label} copiado.`);
+    } catch {
+      window.prompt("Copie o texto abaixo:", text);
+    }
   }
 
   return (
@@ -772,14 +806,12 @@ function AnnualRecordsPanel({
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2 sm:flex">
-                        <Link to="/clientes/$id/dados-ambientais/$recordId" params={{ id: client.id, recordId: record.id }}>
-                          <Button size="sm" className="w-full">Abrir</Button>
-                        </Link>
+                        <Button size="sm" className="w-full" onClick={() => openRecord(record.id)}>Abrir</Button>
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => copy(buildAnnualClientRequestText(record, previous, client.name))}
+                          onClick={() => copy(buildAnnualClientRequestText(record, previous, client.name), "Solicitacao")}
                         >
                           Solicitar
                         </Button>
@@ -787,7 +819,7 @@ function AnnualRecordsPanel({
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => copy(buildAnnualAISummary(record, client.name))}
+                          onClick={() => copy(buildAnnualAISummary(record, client.name), "Resumo para IA")}
                         >
                           IA
                         </Button>

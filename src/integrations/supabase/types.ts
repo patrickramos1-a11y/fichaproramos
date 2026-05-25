@@ -14,27 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      app_users: {
-        Row: {
-          created_at: string
-          email: string
-          id: string
-          name: string
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          id?: string
-          name: string
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          id?: string
-          name?: string
-        }
-        Relationships: []
-      }
       annual_environmental_records: {
         Row: {
           client_id: string
@@ -59,6 +38,27 @@ export type Database = {
           data?: Json
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      app_users: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }

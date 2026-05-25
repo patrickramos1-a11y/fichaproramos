@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useDB, updateAnnualEnvironmentalRecord, deleteAnnualEnvironmentalRecord } from "@/lib/store";
+import { useDB, useDBStatus, addAnnualEnvironmentalRecord, updateAnnualEnvironmentalRecord, deleteAnnualEnvironmentalRecord } from "@/lib/store";
 import {
   ANNUAL_DATA_STATUS_LABELS,
   ANNUAL_MONTH_LABELS,
@@ -29,6 +29,7 @@ import {
   lineItemTotal,
   monthlyTotal,
   annualId,
+  normalizeAnnualEnvironmentalRecord,
   type AnnualLineSectionKey,
 } from "@/lib/annualEnvironmental";
 import {
@@ -72,6 +73,7 @@ const SECTION_OPTIONS = Object.keys(ANNUAL_SECTION_LABELS) as AnnualRecordSectio
 function AnnualRecordPage() {
   const { id, recordId } = Route.useParams();
   const db = useDB();
+  const dbStatus = useDBStatus();
   const client = db.clients.find((entry) => entry.id === id);
   const record = db.annualRecords.find((entry) => entry.id === recordId);
   const previous = record?.previousRecordId
@@ -81,6 +83,34 @@ function AnnualRecordPage() {
         .sort((a, b) => b.yearBase - a.yearBase)[0];
   const [activeTab, setActiveTab] = useState("geral");
 
+  useEffect(() => {
+    if (record || !dbStatus.hydrated || typeof window === "undefined") return;
+    const raw = window.sessionStorage.getItem(`annual-record:${recordId}`)
+      ?? window.localStorage.getItem(`annual-record:${recordId}`);
+    if (!raw) return;
+    try {
+      const restored = normalizeAnnualEnvironmentalRecord(JSON.parse(raw));
+      if (restored.id !== recordId || restored.clientId !== id) return;
+      addAnnualEnvironmentalRecord(restored);
+      toast.success("Ano-base recuperado do armazenamento local.");
+    } catch (err) {
+      console.warn("[annual] failed to restore cached annual record", err);
+    }
+  }, [dbStatus.hydrated, id, record, recordId]);
+
+  if (!dbStatus.hydrated) {
+    return (
+      <AppShell>
+        <Link to="/clientes/$id" params={{ id }} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+          <ArrowLeft className="h-4 w-4" /> Voltar ao cliente
+        </Link>
+        <Card className="mt-4">
+          <CardContent className="p-6 text-sm text-muted-foreground">Carregando dados ambientais anuais...</CardContent>
+        </Card>
+      </AppShell>
+    );
+  }
+
   if (!client || !record) {
     return (
       <AppShell>
@@ -88,7 +118,15 @@ function AnnualRecordPage() {
           <ArrowLeft className="h-4 w-4" /> Voltar ao cliente
         </Link>
         <Card className="mt-4">
-          <CardContent className="p-6 text-sm text-muted-foreground">Ano-base nao encontrado.</CardContent>
+          <CardContent className="space-y-3 p-6 text-sm text-muted-foreground">
+            <div className="font-medium text-foreground">Ano-base nao encontrado.</div>
+            <p>
+              O registro nao foi carregado do banco nem do armazenamento local deste navegador. Volte ao cliente e abra o ano-base novamente.
+            </p>
+            <p>
+              Se isso continuar acontecendo em producao, a tabela anual do Supabase ainda precisa ser aplicada para salvar esses registros no servidor.
+            </p>
+          </CardContent>
         </Card>
       </AppShell>
     );

@@ -699,8 +699,19 @@ function AnnualRecordsPanel({
   const [year, setYear] = useState(suggestedYear);
   const latest = records[0];
 
-  function openRecord(recordId: string) {
-    void nav({ to: "/clientes/$id/dados-ambientais/$recordId", params: { id: client.id, recordId } });
+  function cacheRecord(record?: AnnualEnvironmentalRecord) {
+    if (!record || typeof window === "undefined") return;
+    const payload = JSON.stringify(record);
+    window.sessionStorage.setItem(`annual-record:${record.id}`, payload);
+    window.localStorage.setItem(`annual-record:${record.id}`, payload);
+  }
+
+  function openRecord(recordId: string, recordToCache?: AnnualEnvironmentalRecord) {
+    cacheRecord(recordToCache ?? records.find((entry) => entry.id === recordId));
+    void nav({ to: "/clientes/$id/dados-ambientais/$recordId", params: { id: client.id, recordId } })
+      .catch(() => {
+        window.location.href = `/clientes/${client.id}/dados-ambientais/${recordId}`;
+      });
   }
 
   function createBlank() {
@@ -712,7 +723,7 @@ function AnnualRecordsPanel({
     const existing = records.find((entry) => entry.yearBase === yearBase);
     if (existing) {
       toast.info(`Ano-base ${yearBase} ja existe. Abrindo o registro.`);
-      openRecord(existing.id);
+      openRecord(existing.id, existing);
       return;
     }
     const record = addAnnualEnvironmentalRecord(createEmptyAnnualEnvironmentalRecord({
@@ -721,7 +732,7 @@ function AnnualRecordsPanel({
       units: createAnnualUnitsFromEmpreendimentos(empreendimentos),
     }));
     toast.success(`Ano-base ${yearBase} criado.`);
-    openRecord(record.id);
+    openRecord(record.id, record);
   }
 
   function createFromPrevious() {
@@ -737,12 +748,12 @@ function AnnualRecordsPanel({
     const existing = records.find((entry) => entry.yearBase === yearBase);
     if (existing) {
       toast.info(`Ano-base ${yearBase} ja existe. Abrindo o registro.`);
-      openRecord(existing.id);
+      openRecord(existing.id, existing);
       return;
     }
     const record = addAnnualEnvironmentalRecord(createAnnualRecordFromPrevious(latest, yearBase));
     toast.success(`Ano-base ${yearBase} criado com base em ${latest.yearBase}.`);
-    openRecord(record.id);
+    openRecord(record.id, record);
   }
 
   async function copy(text: string, label: string) {
@@ -806,7 +817,7 @@ function AnnualRecordsPanel({
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2 sm:flex">
-                        <Button size="sm" className="w-full" onClick={() => openRecord(record.id)}>Abrir</Button>
+                        <Button size="sm" className="w-full" onClick={() => openRecord(record.id, record)}>Abrir</Button>
                         <Button
                           type="button"
                           size="sm"

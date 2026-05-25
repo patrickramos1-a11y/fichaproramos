@@ -222,6 +222,41 @@ function syncGlobalOverrides() {
 /* =================== Supabase sync =================== */
 
 let annualRecordsRemoteUnavailable = false;
+const ANNUAL_RECORDS_LOCAL_PREFIX = "ramos-annual-records:";
+
+function annualRecordsLocalKey(userId?: string) {
+  return `${ANNUAL_RECORDS_LOCAL_PREFIX}${userId || "local"}`;
+}
+
+function loadAnnualRecordsLocalFallback(userId?: string): AnnualEnvironmentalRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(annualRecordsLocalKey(userId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((record) => normalizeAnnualEnvironmentalRecord(record));
+  } catch (err) {
+    console.warn("[sync] annual local fallback read failed", err);
+    return [];
+  }
+}
+
+function saveAnnualRecordsLocalFallback(userId?: string, records = store.db.annualRecords) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(annualRecordsLocalKey(userId), JSON.stringify(records));
+  } catch (err) {
+    console.warn("[sync] annual local fallback write failed", err);
+  }
+}
+
+function mergeAnnualRecords(primary: AnnualEnvironmentalRecord[], fallback: AnnualEnvironmentalRecord[]) {
+  const byId = new Map<string, AnnualEnvironmentalRecord>();
+  for (const record of fallback) byId.set(record.id, record);
+  for (const record of primary) byId.set(record.id, record);
+  return Array.from(byId.values()).sort((a, b) => b.yearBase - a.yearBase || b.updatedAt.localeCompare(a.updatedAt));
+}
 
 type TableName =
   | "clients"
@@ -433,13 +468,10 @@ async function initForUser(userId: string) {
     if (annualRecordsRemoteUnavailable) {
       const snap = await loadSnapshot(userId);
       const snapshotDb = normalizeDB(snap as any);
-      if (snapshotDb.annualRecords.length) {
-        loaded.annualRecords = snapshotDb.annualRecords;
-      }
-      store.status = {
-        ...store.status,
-        persistenceError: "Dados Ambientais Anuais em modo local ate a tabela do Supabase ser aplicada.",
-      };
+      loaded.annualRecords = mergeAnnualRecords(
+        loaded.annualRecords,
+        mergeAnnualRecords(snapshotDb.annualRecords, loadAnnualRecordsLocalFallback(userId)),
+      );
     }
     store.db = loaded;
     store.lastSyncedDb = loaded;
@@ -590,11 +622,13 @@ function repairPhotoChecklistKeysForSurveys() {
 }
 
 function persist() {
+  saveAnnualRecordsLocalFallback(store.userId);
   queueSync();
   scheduleEmit();
 }
 
 function persistImmediate() {
+  saveAnnualRecordsLocalFallback(store.userId);
   queueSync(true);
   scheduleEmit();
 }
@@ -965,6 +999,7 @@ export function deleteSurvey(sid: string) {
 export function addAnnualEnvironmentalRecord(record: AnnualEnvironmentalRecord) {
   const normalized = normalizeAnnualEnvironmentalRecord(record);
   store.db = { ...store.db, annualRecords: [normalized, ...store.db.annualRecords] };
+  saveAnnualRecordsLocalFallback(store.userId);
   persist();
   return normalized;
 }
@@ -978,6 +1013,7 @@ export function updateAnnualEnvironmentalRecord(recordId: string, data: Partial<
         : record,
     ),
   };
+  saveAnnualRecordsLocalFallback(store.userId);
   persist();
 }
 
@@ -986,6 +1022,7 @@ export function deleteAnnualEnvironmentalRecord(recordId: string) {
     ...store.db,
     annualRecords: store.db.annualRecords.filter((record) => record.id !== recordId),
   };
+  saveAnnualRecordsLocalFallback(store.userId);
   persist();
 }
 

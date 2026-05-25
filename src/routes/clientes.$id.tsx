@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Outlet, createFileRoute, Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
@@ -94,6 +94,7 @@ type PurposeSummary = {
 
 function ClienteDetail() {
   const { id } = Route.useParams();
+  const location = useLocation();
   const db = useDB();
   const nav = useNavigate();
   const client = db.clients.find((c) => c.id === id);
@@ -205,6 +206,10 @@ function ClienteDetail() {
       typeMeta: row.typeMeta,
     })),
   );
+
+  if (location.pathname.includes(`/clientes/${id}/dados-ambientais/`)) {
+    return <Outlet />;
+  }
 
   if (!client) return <AppShell><p>Cliente nao encontrado.</p></AppShell>;
 

@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import {
   getSurveyTypeMeta,
   useDB,
+  useDBStatus,
   addProject,
   deleteProject,
   addEmpreendimento,
@@ -695,9 +696,17 @@ function AnnualRecordsPanel({
   records: AnnualEnvironmentalRecord[];
 }) {
   const nav = useNavigate();
+  const dbStatus = useDBStatus();
   const suggestedYear = String(new Date().getFullYear() - 1);
   const [year, setYear] = useState(suggestedYear);
   const latest = records[0];
+  const annualDbReady = dbStatus.annualRecordsAvailable !== false;
+
+  function blockIfAnnualDbMissing() {
+    if (annualDbReady) return false;
+    toast.error("Banco anual nao configurado. Aplique a migration annual_environmental_records no Supabase antes de criar anos-base.");
+    return true;
+  }
 
   function cacheRecord(record?: AnnualEnvironmentalRecord) {
     if (!record || typeof window === "undefined") return;
@@ -715,6 +724,7 @@ function AnnualRecordsPanel({
   }
 
   function createBlank() {
+    if (blockIfAnnualDbMissing()) return;
     const yearBase = Number(year);
     if (!Number.isFinite(yearBase) || yearBase < 2000) {
       toast.error("Informe um ano-base valido.");
@@ -736,6 +746,7 @@ function AnnualRecordsPanel({
   }
 
   function createFromPrevious() {
+    if (blockIfAnnualDbMissing()) return;
     const yearBase = Number(year);
     if (!latest) {
       toast.error("Crie primeiro um ano-base inicial.");
@@ -782,15 +793,33 @@ function AnnualRecordsPanel({
               className="w-28"
               placeholder="Ano"
             />
-            <Button type="button" onClick={createBlank}>
-              <Plus className="mr-1 h-4 w-4" /> Novo ano-base
+            <Button type="button" onClick={createBlank} disabled={!annualDbReady}>
+              <Plus className="mr-1 h-4 w-4" /> Criar ano-base
             </Button>
-            <Button type="button" variant="outline" onClick={createFromPrevious} disabled={!latest}>
+            <Button type="button" variant="outline" onClick={createFromPrevious} disabled={!latest || !annualDbReady}>
               <CalendarDays className="mr-1 h-4 w-4" /> Base anterior
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {!annualDbReady && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div className="space-y-1">
+                  <div className="font-medium">Banco anual nao configurado</div>
+                  <p>
+                    A tabela <code className="rounded bg-amber-100 px-1">annual_environmental_records</code> ainda nao esta disponivel no Supabase.
+                    A criacao e alteracao de anos-base ficam bloqueadas para evitar registros que somem ao recarregar.
+                  </p>
+                  <p className="text-xs">
+                    Migration local: <code>supabase/migrations/20260525090000_create_annual_environmental_records.sql</code>
+                    {dbStatus.annualRecordsError ? ` · erro: ${dbStatus.annualRecordsError}` : ""}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           {records.length === 0 ? (
             <EmptyHint label="Nenhum ano-base cadastrado para este cliente. Crie o primeiro ano para iniciar a memoria ambiental anual." />
           ) : (
@@ -817,7 +846,7 @@ function AnnualRecordsPanel({
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2 sm:flex">
-                        <Button size="sm" className="w-full" onClick={() => openRecord(record.id, record)}>Abrir</Button>
+                        <Button size="sm" className="w-full" onClick={() => openRecord(record.id, record)}>Abrir gestao</Button>
                         <Button
                           type="button"
                           size="sm"

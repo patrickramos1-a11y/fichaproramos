@@ -53,6 +53,7 @@ import {
 } from "@/lib/types";
 import {
   ArrowLeft,
+  AlertTriangle,
   Clipboard,
   Download,
   FileText,
@@ -139,6 +140,10 @@ function AnnualRecordPage() {
   const validDocuments = countAnnualValidDocuments(currentRecord);
 
   function patch(data: Partial<AnnualEnvironmentalRecord>) {
+    if (dbStatus.annualRecordsAvailable === false) {
+      toast.error("Banco anual nao configurado. Aplique a migration no Supabase para salvar alteracoes.");
+      return;
+    }
     updateAnnualEnvironmentalRecord(currentRecord.id, data);
   }
 
@@ -222,6 +227,25 @@ function AnnualRecordPage() {
           </div>
         </CardContent>
       </Card>
+
+      {dbStatus.annualRecordsAvailable === false && (
+        <Card className="mb-5 border-amber-200 bg-amber-50">
+          <CardContent className="flex items-start gap-3 p-4 text-sm text-amber-950">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="space-y-1">
+              <div className="font-medium">Banco anual nao configurado</div>
+              <p>
+                Esta tela esta em modo leitura/protecao porque a tabela <code className="rounded bg-amber-100 px-1">annual_environmental_records</code> nao respondeu no Supabase.
+                As abas ficam visiveis, mas novas alteracoes nao serao salvas ate a migration ser aplicada.
+              </p>
+              <p className="text-xs">
+                Migration local: <code>supabase/migrations/20260525090000_create_annual_environmental_records.sql</code>
+                {dbStatus.annualRecordsError ? ` · erro: ${dbStatus.annualRecordsError}` : ""}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-4 flex h-auto flex-wrap justify-start">
@@ -414,6 +438,9 @@ function OperationalTab({ record, patch }: RecordTabProps) {
   }
   return (
     <EditorCard title="Dados operacionais" actionLabel="Adicionar periodo" onAdd={() => patch({ operationalData: { periods: [...periods, { id: annualId("op"), status: "pendente" }] } })}>
+      {periods.length === 0 && (
+        <EmptyInline>Nenhum periodo operacional cadastrado. Adicione horarios, funcionarios e atividade por periodo do ano.</EmptyInline>
+      )}
       <Table>
         <TableHeader><TableRow><TableHead>Unidade</TableHead><TableHead>Periodo</TableHead><TableHead>Atividade</TableHead><TableHead>Funcionarios</TableHead><TableHead>Horario</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader>
         <TableBody>
@@ -479,6 +506,9 @@ function LineItemsTab({ record, patch, sectionKey, title }: RecordTabProps & { s
       actionLabel="Adicionar item"
       onAdd={() => patch({ [sectionKey]: { items: [...items, { id: annualId("item"), name: "", unit: "kg", monthly: emptyMonthlyValues(), status: "pendente", validationState: "novo" }] } } as Partial<AnnualEnvironmentalRecord>)}
     >
+      {items.length === 0 && (
+        <EmptyInline>Nenhum item cadastrado nesta secao. Use “Adicionar item” para criar linhas mensais e calcular o total anual.</EmptyInline>
+      )}
       <Table>
         <TableHeader>
           <TableRow>
@@ -522,6 +552,9 @@ function StaffTab({ record, patch }: RecordTabProps) {
   }
   return (
     <EditorCard title="Funcionarios e horarios" actionLabel="Adicionar periodo" onAdd={() => patch({ staffAndSchedules: { periods: [...periods, { id: annualId("staff"), status: "pendente" }] } })}>
+      {periods.length === 0 && (
+        <EmptyInline>Nenhum periodo de funcionarios/horarios cadastrado. Adicione um periodo quando a quantidade ou jornada mudar durante o ano.</EmptyInline>
+      )}
       <Table>
         <TableHeader><TableRow><TableHead>Unidade</TableHead><TableHead>Periodo</TableHead><TableHead>Qtd.</TableHead><TableHead>Horario</TableHead><TableHead>Observacao</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader>
         <TableBody>
@@ -549,6 +582,9 @@ function VehiclesTab({ record, patch }: RecordTabProps) {
   }
   return (
     <EditorCard title="Veiculos" actionLabel="Adicionar veiculo" onAdd={() => patch({ vehicles: { items: [...items, { id: annualId("vehicle"), status: "pendente", validationState: "novo" }] } })}>
+      {items.length === 0 && (
+        <EmptyInline>Nenhum veiculo cadastrado para este ano-base. Adicione veiculos ativos ou marque como nao se aplica na consolidacao.</EmptyInline>
+      )}
       <Table>
         <TableHeader><TableRow><TableHead>Modelo</TableHead><TableHead>Placa</TableHead><TableHead>Ano</TableHead><TableHead>Combustivel</TableHead><TableHead>Situacao</TableHead><TableHead>Status</TableHead><TableHead>Obs.</TableHead><TableHead /></TableRow></TableHeader>
         <TableBody>
@@ -577,6 +613,9 @@ function WaterTab({ record, patch }: RecordTabProps) {
   }
   return (
     <EditorCard title="Agua, efluentes e ETE" actionLabel="Adicionar registro" onAdd={() => patch({ waterEffluents: { ...record.waterEffluents, applicable: true, entries: [...entries, { id: annualId("water"), status: "pendente" }] } })}>
+      {entries.length === 0 && (
+        <EmptyInline>Nenhum registro de agua, efluentes ou ETE. Este modulo e opcional e pode ser preenchido quando aplicavel ao cliente.</EmptyInline>
+      )}
       <Table>
         <TableHeader><TableRow><TableHead>Unidade</TableHead><TableHead>Consumo agua</TableHead><TableHead>Origem</TableHead><TableHead>Efluente</TableHead><TableHead>Sistema</TableHead><TableHead>Eficiencia</TableHead><TableHead>Status</TableHead><TableHead>Obs.</TableHead><TableHead /></TableRow></TableHeader>
         <TableBody>
@@ -606,6 +645,9 @@ function AnalysesTab({ record, patch }: RecordTabProps) {
   }
   return (
     <EditorCard title="Analises ambientais" actionLabel="Adicionar analise" onAdd={() => patch({ analyses: { items: [...items, { id: annualId("analysis"), status: "pendente", validationState: "novo" }] } })}>
+      {items.length === 0 && (
+        <EmptyInline>Nenhuma analise ambiental cadastrada. Adicione analises de agua, efluente, potabilidade, emissao ou outro laudo relevante.</EmptyInline>
+      )}
       <Table>
         <TableHeader><TableRow><TableHead>Tipo</TableHead><TableHead>Data</TableHead><TableHead>Laboratorio</TableHead><TableHead>Validade</TableHead><TableHead>Resultado</TableHead><TableHead>Proxima</TableHead><TableHead>Status</TableHead><TableHead>Obs.</TableHead><TableHead /></TableRow></TableHeader>
         <TableBody>
@@ -653,6 +695,9 @@ function DocumentsTab({ record, patch }: RecordTabProps) {
       <div className="mb-4">
         <Input type="file" multiple onChange={(event) => void addFiles(event.target.files)} />
       </div>
+      {docs.length === 0 && (
+        <EmptyInline>Nenhum documento anexado. Use o campo acima para registrar planilhas, PDFs, CDF/MTR, contas de energia, laudos e comprovantes recebidos.</EmptyInline>
+      )}
       <Table>
         <TableHeader><TableRow><TableHead>Documento</TableHead><TableHead>Secao</TableHead><TableHead>Status</TableHead><TableHead>Observacao</TableHead><TableHead>Data</TableHead><TableHead /></TableRow></TableHeader>
         <TableBody>
@@ -679,6 +724,9 @@ function PendingTab({ record, patch }: RecordTabProps) {
   }
   return (
     <EditorCard title="Pendencias de dados" actionLabel="Adicionar pendencia" onAdd={() => patch({ pendingItems: [...items, { id: annualId("pending"), description: "", status: "em_aberto", createdAt: new Date().toISOString() }] })}>
+      {items.length === 0 && (
+        <EmptyInline>Nenhuma pendencia cadastrada. Adicione aqui tudo que precisa ser solicitado, conferido ou complementado pelo cliente.</EmptyInline>
+      )}
       <Table>
         <TableHeader><TableRow><TableHead>Pendencia</TableHead><TableHead>Secao</TableHead><TableHead>Responsavel</TableHead><TableHead>Prazo</TableHead><TableHead>Status</TableHead><TableHead>Obs.</TableHead><TableHead /></TableRow></TableHeader>
         <TableBody>
@@ -752,6 +800,9 @@ function MonthlyTable<T extends { id: string; unitId?: string; monthly: Partial<
   onStatusChange: (row: T, status: AnnualDataStatus) => void;
   onDelete: (row: T) => void;
 }) {
+  if (rows.length === 0) {
+    return <EmptyInline>Nenhuma linha mensal criada. Use o botao acima para criar registros por unidade ou uma linha geral do cliente.</EmptyInline>;
+  }
   return (
     <Table>
       <TableHeader>

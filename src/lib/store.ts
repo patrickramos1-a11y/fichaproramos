@@ -41,6 +41,8 @@ interface DBStatus {
   persistPending: boolean;
   persistenceError?: string;
   authed: boolean;
+  annualRecordsAvailable?: boolean;
+  annualRecordsError?: string;
 }
 
 interface StoreRuntime {
@@ -222,6 +224,7 @@ function syncGlobalOverrides() {
 /* =================== Supabase sync =================== */
 
 let annualRecordsRemoteUnavailable = false;
+let annualRecordsRemoteError: string | undefined;
 const ANNUAL_RECORDS_LOCAL_PREFIX = "ramos-annual-records:";
 
 function annualRecordsLocalKey(userId?: string) {
@@ -309,20 +312,29 @@ async function flushSync() {
   const after = store.db;
   store.lastSyncedDb = after;
   try {
-    await Promise.all([
+    const syncJobs = [
       diffTable("clients", before.clients, after.clients),
       diffTable("empreendimentos", before.empreendimentos, after.empreendimentos),
       diffTable("projects", before.projects, after.projects),
       diffTable("surveys", before.surveys, after.surveys),
       diffTable("survey_templates", before.templates, after.templates),
       diffTable("custom_survey_types", before.customSurveyTypes, after.customSurveyTypes),
-      diffTable("annual_environmental_records", before.annualRecords, after.annualRecords),
-    ]);
+    ];
+    if (!annualRecordsRemoteUnavailable) {
+      syncJobs.push(diffTable("annual_environmental_records", before.annualRecords, after.annualRecords));
+    }
+    await Promise.all(syncJobs);
     if (before.formOverrides !== after.formOverrides) {
       const { error } = await supabase.from("form_overrides").upsert({ id: "singleton", data: after.formOverrides as any });
       if (error) console.error("[sync] upsert form_overrides", error);
     }
-    store.status = { ...store.status, persistPending: false, persistenceError: undefined };
+    store.status = {
+      ...store.status,
+      persistPending: false,
+      persistenceError: undefined,
+      annualRecordsAvailable: !annualRecordsRemoteUnavailable,
+      annualRecordsError: annualRecordsRemoteError,
+    };
     if (store.userId) {
       const uid = store.userId;
       idle(() => void saveSnapshot(uid, store.db));
@@ -444,6 +456,7 @@ async function fetchAll(): Promise<DB> {
     supabase.from("form_overrides").select("data").eq("id", "singleton").maybeSingle(),
   ]);
   annualRecordsRemoteUnavailable = !!annual.error;
+  annualRecordsRemoteError = annual.error?.message;
   if (annual.error) {
     console.warn("[sync] annual_environmental_records unavailable; using local snapshot fallback when possible.", annual.error);
   }
@@ -475,6 +488,11 @@ async function initForUser(userId: string) {
     }
     store.db = loaded;
     store.lastSyncedDb = loaded;
+    store.status = {
+      ...store.status,
+      annualRecordsAvailable: !annualRecordsRemoteUnavailable,
+      annualRecordsError: annualRecordsRemoteError,
+    };
     syncGlobalOverrides();
     subscribeRealtime();
     seedBuiltInSurveyTypes();
@@ -504,10 +522,20 @@ async function initForUser(userId: string) {
 
 function clearForLogout() {
   store.userId = undefined;
+  annualRecordsRemoteUnavailable = false;
+  annualRecordsRemoteError = undefined;
   unsubscribeRealtime();
   store.db = EMPTY_DB;
   store.lastSyncedDb = EMPTY_DB;
-  store.status = { ...store.status, hydrated: true, authed: false, persistPending: false, persistenceError: undefined };
+  store.status = {
+    ...store.status,
+    hydrated: true,
+    authed: false,
+    persistPending: false,
+    persistenceError: undefined,
+    annualRecordsAvailable: undefined,
+    annualRecordsError: undefined,
+  };
   syncGlobalOverrides();
   emit();
 }
@@ -653,7 +681,7 @@ function getStatusSnapshot() {
 }
 
 function getServerStatusSnapshot(): DBStatus {
-  return { hydrated: false, persistPending: false, authed: false };
+  return { hydrated: false, persistPending: false, authed: false, annualRecordsAvailable: undefined };
 }
 
 export function useDB() {

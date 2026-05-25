@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Wifi, WifiOff, Loader2, RotateCw } from "lucide-react";
+import { Database, Wifi, WifiOff, Loader2, RotateCw } from "lucide-react";
 import { useDBStatus } from "@/lib/store";
 
 export function OfflineIndicator() {
@@ -13,7 +13,8 @@ export function OfflineIndicator() {
     return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
 
-  const showStatus = !online || status.persistPending || !!status.persistenceError;
+  const annualUnavailable = status.annualRecordsAvailable === false;
+  const showStatus = !online || status.persistPending || !!status.persistenceError || annualUnavailable;
 
   const hardReload = () => {
     try {
@@ -28,10 +29,14 @@ export function OfflineIndicator() {
   return (
     <div className="flex items-center gap-1.5">
       {showStatus && (
-        <div className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border" title={status.persistenceError || ""}>
+        <div
+          className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border"
+          title={status.persistenceError || status.annualRecordsError || ""}
+        >
           {!online ? <><WifiOff className="h-3.5 w-3.5 text-warn-foreground" /><span className="text-warn-foreground">Offline</span></>
             : status.persistPending ? <><Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /><span className="text-muted-foreground">Salvando…</span></>
-            : <><Wifi className="h-3.5 w-3.5 text-destructive" /><span className="text-destructive">Erro de sincronia</span></>}
+            : status.persistenceError ? <><Wifi className="h-3.5 w-3.5 text-destructive" /><span className="text-destructive">Erro de sincronia</span></>
+            : <><Database className="h-3.5 w-3.5 text-amber-700" /><span className="text-amber-700">Banco anual nao configurado</span></>}
         </div>
       )}
       <button

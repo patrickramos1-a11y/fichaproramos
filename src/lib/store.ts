@@ -1019,6 +1019,37 @@ export function updateSurvey(sid: string, data: Partial<Survey>) {
   persist();
 }
 
+function publicShareToken() {
+  const cryptoObj = typeof crypto !== "undefined" ? crypto : undefined;
+  const bytes = new Uint8Array(18);
+  if (cryptoObj?.getRandomValues) cryptoObj.getRandomValues(bytes);
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  return Array.from(bytes, (byte) => byte.toString(36).padStart(2, "0")).join("");
+}
+
+export function ensureSurveyPublicShare(sid: string) {
+  const survey = store.db.surveys.find((entry) => entry.id === sid);
+  if (!survey) return undefined;
+  const token = survey.publicShareToken || publicShareToken();
+  const next: Partial<Survey> = {
+    publicShareEnabled: true,
+    publicShareToken: token,
+    publicShareRevokedAt: undefined,
+    publicShareCreatedAt: survey.publicShareCreatedAt ?? new Date().toISOString(),
+  };
+  updateSurvey(sid, next);
+  return token;
+}
+
+export function revokeSurveyPublicShare(sid: string) {
+  const survey = store.db.surveys.find((entry) => entry.id === sid);
+  if (!survey) return;
+  updateSurvey(sid, {
+    publicShareEnabled: false,
+    publicShareRevokedAt: new Date().toISOString(),
+  });
+}
+
 export function deleteSurvey(sid: string) {
   store.db = { ...store.db, surveys: store.db.surveys.filter((survey) => survey.id !== sid) };
   persist();

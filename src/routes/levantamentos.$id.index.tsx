@@ -6,7 +6,7 @@ import {
   removeAttachment, addPendencia, removePendencia, setFieldNote, setFieldNA,
   setEnabledModules, useDBStatus, setModuleNA, setSubgroupNA, enableModule,
   closeSurveyWithAutoNA, reopenSurvey, addTemplate, setSubgroupNote, setModuleDone,
-  setSubgroupDone, useEffectiveModulesForSurvey, useSurveyTypeMeta,
+  setSubgroupDone, useEffectiveModulesForSurvey, useSurveyTypeMeta, ensureSurveyPublicShare,
 } from "@/lib/store";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ import {
   ArrowLeft, FileText, Paperclip, Plus, Trash2, AlertTriangle, CheckCircle2,
   FileDown, Settings2, Files, ClipboardList, Signature, ChevronRight, Ban, Check, EyeOff,
   Lock, Unlock, Clock, Save, MessageSquarePlus,
-  BookOpen, ListChecks,
+  BookOpen, ListChecks, Share2,
 } from "lucide-react";
 import {
   shouldShowField, CENTRAL_TAB_MODULES,
@@ -181,6 +181,19 @@ function SurveyEditorReady({ survey, projectName, clientName, activeTab, setActi
             addTemplate({ name: name.trim(), type: survey.type, moduleIds: enabled });
           }}>
             <Save className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" title="Copiar link externo de preenchimento" onClick={async () => {
+            const token = ensureSurveyPublicShare(survey.id);
+            if (!token) return;
+            const url = `${window.location.origin}/preencher/${token}`;
+            try {
+              await navigator.clipboard?.writeText(url);
+              window.alert("Link externo copiado. Quem acessar sem login verá somente este levantamento.");
+            } catch {
+              window.prompt("Copie o link externo:", url);
+            }
+          }}>
+            <Share2 className="h-4 w-4" />
           </Button>
           {survey.closedAt && (
             <Link to="/levantamentos/$id/resumo" params={{ id: survey.id }}>

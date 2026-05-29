@@ -390,6 +390,13 @@ export interface Survey {
   responsavel?: string;
   /** Pessoa que realizou o levantamento em campo. */
   realizadoPor?: string;
+  /** Link externo restrito para preenchimento de um levantamento especifico. */
+  publicShareEnabled?: boolean;
+  publicShareToken?: string;
+  publicShareCreatedAt?: string;
+  publicShareRevokedAt?: string;
+  publicShareLastSubmittedAt?: string;
+  publicShareLastEditorName?: string;
 }
 
 /* ============ Dados ambientais anuais / Gestao RAPP-RIAA ============ */

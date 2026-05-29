@@ -143,7 +143,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | undefined>(undefined);
   const loc = useLocation();
   const navigate = useNavigate();
-  const isPublic = loc.pathname === "/login" || loc.pathname === "/reset-password";
+  const isPublic = loc.pathname === "/login" || loc.pathname === "/reset-password" || loc.pathname.startsWith("/preencher/");
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {

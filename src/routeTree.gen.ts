@@ -18,6 +18,7 @@ import { Route as LevantamentosIndexRouteImport } from './routes/levantamentos.i
 import { Route as ConfiguracoesIndexRouteImport } from './routes/configuracoes.index'
 import { Route as ClientesIndexRouteImport } from './routes/clientes.index'
 import { Route as ProjetosIdRouteImport } from './routes/projetos.$id'
+import { Route as PreencherTokenRouteImport } from './routes/preencher.$token'
 import { Route as LevantamentosNovoRouteImport } from './routes/levantamentos.novo'
 import { Route as ClientesIdRouteImport } from './routes/clientes.$id'
 import { Route as LevantamentosIdIndexRouteImport } from './routes/levantamentos.$id.index'
@@ -70,6 +71,11 @@ const ProjetosIdRoute = ProjetosIdRouteImport.update({
   path: '/projetos/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreencherTokenRoute = PreencherTokenRouteImport.update({
+  id: '/preencher/$token',
+  path: '/preencher/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LevantamentosNovoRoute = LevantamentosNovoRouteImport.update({
   id: '/levantamentos/novo',
   path: '/levantamentos/novo',
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/clientes/$id': typeof ClientesIdRouteWithChildren
   '/levantamentos/novo': typeof LevantamentosNovoRoute
+  '/preencher/$token': typeof PreencherTokenRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/clientes/': typeof ClientesIndexRoute
   '/configuracoes/': typeof ConfiguracoesIndexRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/clientes/$id': typeof ClientesIdRouteWithChildren
   '/levantamentos/novo': typeof LevantamentosNovoRoute
+  '/preencher/$token': typeof PreencherTokenRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/clientes': typeof ClientesIndexRoute
   '/configuracoes': typeof ConfiguracoesIndexRoute
@@ -144,6 +152,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/clientes/$id': typeof ClientesIdRouteWithChildren
   '/levantamentos/novo': typeof LevantamentosNovoRoute
+  '/preencher/$token': typeof PreencherTokenRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/clientes/': typeof ClientesIndexRoute
   '/configuracoes/': typeof ConfiguracoesIndexRoute
@@ -163,6 +172,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/clientes/$id'
     | '/levantamentos/novo'
+    | '/preencher/$token'
     | '/projetos/$id'
     | '/clientes/'
     | '/configuracoes/'
@@ -179,6 +189,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/clientes/$id'
     | '/levantamentos/novo'
+    | '/preencher/$token'
     | '/projetos/$id'
     | '/clientes'
     | '/configuracoes'
@@ -196,6 +207,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/clientes/$id'
     | '/levantamentos/novo'
+    | '/preencher/$token'
     | '/projetos/$id'
     | '/clientes/'
     | '/configuracoes/'
@@ -214,6 +226,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   ClientesIdRoute: typeof ClientesIdRouteWithChildren
   LevantamentosNovoRoute: typeof LevantamentosNovoRoute
+  PreencherTokenRoute: typeof PreencherTokenRoute
   ProjetosIdRoute: typeof ProjetosIdRoute
   ClientesIndexRoute: typeof ClientesIndexRoute
   LevantamentosIndexRoute: typeof LevantamentosIndexRoute
@@ -285,6 +298,13 @@ declare module '@tanstack/react-router' {
       path: '/projetos/$id'
       fullPath: '/projetos/$id'
       preLoaderRoute: typeof ProjetosIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preencher/$token': {
+      id: '/preencher/$token'
+      path: '/preencher/$token'
+      fullPath: '/preencher/$token'
+      preLoaderRoute: typeof PreencherTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/levantamentos/novo': {
@@ -366,6 +386,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   ClientesIdRoute: ClientesIdRouteWithChildren,
   LevantamentosNovoRoute: LevantamentosNovoRoute,
+  PreencherTokenRoute: PreencherTokenRoute,
   ProjetosIdRoute: ProjetosIdRoute,
   ClientesIndexRoute: ClientesIndexRoute,
   LevantamentosIndexRoute: LevantamentosIndexRoute,

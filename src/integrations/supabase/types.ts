@@ -244,7 +244,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_public_survey: { Args: { p_token: string }; Returns: Json }
+      update_public_survey: {
+        Args: { p_editor_name?: string; p_patch: Json; p_token: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

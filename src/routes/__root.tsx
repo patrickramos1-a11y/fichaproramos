@@ -15,6 +15,11 @@ import { tryRecoverFromChunkError, isChunkLoadError } from "@/lib/error-capture"
 
 import appCss from "../styles.css?url";
 
+const SITE_URL = "https://fichaproramos.vercel.app";
+const APP_TITLE = "Ficha de Levantamento | Ramos Engenharia";
+const APP_DESCRIPTION = "Coleta técnica com fotos, coordenadas, documentos e dados ambientais organizados.";
+const OG_IMAGE = `${SITE_URL}/og/og-ficha-levantamento-v2.png`;
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -87,24 +92,41 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Ficha de Levantamento" },
-      { name: "description", content: "Field Navigator Pro is a mobile and web platform for technical and environmental surveys." },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Ficha de Levantamento" },
-      { property: "og:description", content: "Field Navigator Pro is a mobile and web platform for technical and environmental surveys." },
+      { title: APP_TITLE },
+      { name: "description", content: APP_DESCRIPTION },
+      { name: "author", content: "Ramos Engenharia" },
+      { name: "application-name", content: "Ficha de Visita" },
+      { name: "apple-mobile-web-app-title", content: "Ficha de Visita" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { name: "theme-color", content: "#00b86b" },
+      { property: "og:title", content: APP_TITLE },
+      { property: "og:description", content: APP_DESCRIPTION },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Ficha de Levantamento" },
-      { name: "twitter:description", content: "Field Navigator Pro is a mobile and web platform for technical and environmental surveys." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/58fd9c06-95b0-467d-82f4-5c21cb7e8f50/id-preview-39326b18--0b460bec-8043-4314-a64b-05109d3e3ef3.lovable.app-1778361135836.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/58fd9c06-95b0-467d-82f4-5c21cb7e8f50/id-preview-39326b18--0b460bec-8043-4314-a64b-05109d3e3ef3.lovable.app-1778361135836.png" },
+      { property: "og:url", content: SITE_URL },
+      { property: "og:site_name", content: "Ramos Engenharia" },
+      { property: "og:locale", content: "pt_BR" },
+      { property: "og:image", content: OG_IMAGE },
+      { property: "og:image:secure_url", content: OG_IMAGE },
+      { property: "og:image:type", content: "image/png" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:image:alt", content: "Ficha de Levantamento da Ramos Engenharia" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: APP_TITLE },
+      { name: "twitter:description", content: APP_DESCRIPTION },
+      { name: "twitter:image", content: OG_IMAGE },
+      { name: "twitter:image:alt", content: "Ficha de Levantamento da Ramos Engenharia" },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon.png" },
+      { rel: "icon", type: "image/png", sizes: "192x192", href: "/icons/ramos-app-icon-192.png" },
+      { rel: "apple-touch-icon", sizes: "180x180", href: "/icons/apple-touch-icon.png" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   }),
   shellComponent: RootShell,
@@ -115,7 +137,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
       </head>

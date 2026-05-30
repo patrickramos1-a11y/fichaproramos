@@ -1,0 +1,31 @@
+{
+  "name": "Ficha de Levantamento | Ramos Engenharia",
+  "short_name": "Ficha de Visita",
+  "description": "Plataforma de coleta e gestão de levantamentos técnicos e ambientais.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#00b86b",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/icons/ramos-app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/ramos-app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/ramos-app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -24,6 +24,7 @@ import { Route as ClientesIdRouteImport } from './routes/clientes.$id'
 import { Route as LevantamentosIdIndexRouteImport } from './routes/levantamentos.$id.index'
 import { Route as LevantamentosIdResumoRouteImport } from './routes/levantamentos.$id.resumo'
 import { Route as ConfiguracoesTiposTypeIdRouteImport } from './routes/configuracoes.tipos.$typeId'
+import { Route as ClientesIdLevantamentosSurveyIdRouteImport } from './routes/clientes.$id.levantamentos.$surveyId'
 import { Route as ClientesIdDadosAmbientaisRecordIdRouteImport } from './routes/clientes.$id.dados-ambientais.$recordId'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -102,6 +103,12 @@ const ConfiguracoesTiposTypeIdRoute =
     path: '/tipos/$typeId',
     getParentRoute: () => ConfiguracoesRoute,
   } as any)
+const ClientesIdLevantamentosSurveyIdRoute =
+  ClientesIdLevantamentosSurveyIdRouteImport.update({
+    id: '/levantamentos/$surveyId',
+    path: '/levantamentos/$surveyId',
+    getParentRoute: () => ClientesIdRoute,
+  } as any)
 const ClientesIdDadosAmbientaisRecordIdRoute =
   ClientesIdDadosAmbientaisRecordIdRouteImport.update({
     id: '/dados-ambientais/$recordId',
@@ -126,6 +133,7 @@ export interface FileRoutesByFullPath {
   '/levantamentos/$id/resumo': typeof LevantamentosIdResumoRoute
   '/levantamentos/$id/': typeof LevantamentosIdIndexRoute
   '/clientes/$id/dados-ambientais/$recordId': typeof ClientesIdDadosAmbientaisRecordIdRoute
+  '/clientes/$id/levantamentos/$surveyId': typeof ClientesIdLevantamentosSurveyIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -143,6 +151,7 @@ export interface FileRoutesByTo {
   '/levantamentos/$id/resumo': typeof LevantamentosIdResumoRoute
   '/levantamentos/$id': typeof LevantamentosIdIndexRoute
   '/clientes/$id/dados-ambientais/$recordId': typeof ClientesIdDadosAmbientaisRecordIdRoute
+  '/clientes/$id/levantamentos/$surveyId': typeof ClientesIdLevantamentosSurveyIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -162,6 +171,7 @@ export interface FileRoutesById {
   '/levantamentos/$id/resumo': typeof LevantamentosIdResumoRoute
   '/levantamentos/$id/': typeof LevantamentosIdIndexRoute
   '/clientes/$id/dados-ambientais/$recordId': typeof ClientesIdDadosAmbientaisRecordIdRoute
+  '/clientes/$id/levantamentos/$surveyId': typeof ClientesIdLevantamentosSurveyIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -182,6 +192,7 @@ export interface FileRouteTypes {
     | '/levantamentos/$id/resumo'
     | '/levantamentos/$id/'
     | '/clientes/$id/dados-ambientais/$recordId'
+    | '/clientes/$id/levantamentos/$surveyId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -199,6 +210,7 @@ export interface FileRouteTypes {
     | '/levantamentos/$id/resumo'
     | '/levantamentos/$id'
     | '/clientes/$id/dados-ambientais/$recordId'
+    | '/clientes/$id/levantamentos/$surveyId'
   id:
     | '__root__'
     | '/'
@@ -217,6 +229,7 @@ export interface FileRouteTypes {
     | '/levantamentos/$id/resumo'
     | '/levantamentos/$id/'
     | '/clientes/$id/dados-ambientais/$recordId'
+    | '/clientes/$id/levantamentos/$surveyId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -342,6 +355,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConfiguracoesTiposTypeIdRouteImport
       parentRoute: typeof ConfiguracoesRoute
     }
+    '/clientes/$id/levantamentos/$surveyId': {
+      id: '/clientes/$id/levantamentos/$surveyId'
+      path: '/levantamentos/$surveyId'
+      fullPath: '/clientes/$id/levantamentos/$surveyId'
+      preLoaderRoute: typeof ClientesIdLevantamentosSurveyIdRouteImport
+      parentRoute: typeof ClientesIdRoute
+    }
     '/clientes/$id/dados-ambientais/$recordId': {
       id: '/clientes/$id/dados-ambientais/$recordId'
       path: '/dados-ambientais/$recordId'
@@ -368,11 +388,13 @@ const ConfiguracoesRouteWithChildren = ConfiguracoesRoute._addFileChildren(
 
 interface ClientesIdRouteChildren {
   ClientesIdDadosAmbientaisRecordIdRoute: typeof ClientesIdDadosAmbientaisRecordIdRoute
+  ClientesIdLevantamentosSurveyIdRoute: typeof ClientesIdLevantamentosSurveyIdRoute
 }
 
 const ClientesIdRouteChildren: ClientesIdRouteChildren = {
   ClientesIdDadosAmbientaisRecordIdRoute:
     ClientesIdDadosAmbientaisRecordIdRoute,
+  ClientesIdLevantamentosSurveyIdRoute: ClientesIdLevantamentosSurveyIdRoute,
 }
 
 const ClientesIdRouteWithChildren = ClientesIdRoute._addFileChildren(

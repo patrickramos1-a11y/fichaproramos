@@ -41,6 +41,7 @@ type ClientHit = {
 type SurveyHit = {
   kind: "survey";
   id: string;
+  clientId?: string;
   title: string;
   clientName?: string;
   status: string;
@@ -101,7 +102,7 @@ export function BuscaGlobalTab({ onOpen }: { onOpen: (moduleId: string) => void 
         const proj = getSurveyProject(s, db.projects);
         const client = getSurveyClient(s, db.clients, db.projects);
         out.push({
-          kind: "survey", id: s.id, title: s.title || "(sem título)",
+          kind: "survey", id: s.id, clientId: client?.id ?? s.clientId, title: s.title || "(sem título)",
           clientName: client?.name, status: s.closedAt ? "Concluído" : "Em andamento",
           matched: s.title || "(sem título)",
         });
@@ -239,9 +240,8 @@ export function BuscaGlobalTab({ onOpen }: { onOpen: (moduleId: string) => void 
               {groups.surveys.map((h) => (
                 <Link
                   key={h.id}
-                  to="/levantamentos/$id"
-                  params={{ id: h.id }}
-                  search={{ mode: "edit" }}
+                  to={h.clientId ? "/clientes/$id/levantamentos/$surveyId" : "/levantamentos/$id"}
+                  params={h.clientId ? { id: h.clientId, surveyId: h.id } : { id: h.id }}
                   className="block rounded-md border bg-card hover:border-primary/40 hover:bg-secondary/40 transition-colors px-3 py-2"
                 >
                   <div className="flex items-center gap-2 flex-wrap">
@@ -252,7 +252,7 @@ export function BuscaGlobalTab({ onOpen }: { onOpen: (moduleId: string) => void 
                       <span className="text-[11px] text-muted-foreground">{h.clientName}</span>
                     )}
                     <span className="ml-auto text-[10px] text-muted-foreground inline-flex items-center gap-1">
-                      Abrir <ChevronRight className="h-3 w-3" />
+                      Abrir consulta <ChevronRight className="h-3 w-3" />
                     </span>
                   </div>
                 </Link>

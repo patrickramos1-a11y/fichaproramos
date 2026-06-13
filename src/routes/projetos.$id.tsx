@@ -108,7 +108,7 @@ function ProjetoDetail() {
             return (
               <Card key={s.id}>
                 <CardContent className="flex items-center justify-between p-4">
-                  <Link to="/levantamentos/$id" params={{ id: s.id }} search={{ mode: "read" }} className="flex-1 flex items-center gap-3">
+                  <Link to="/clientes/$id/levantamentos/$surveyId" params={{ id: s.clientId, surveyId: s.id }} className="flex-1 flex items-center gap-3">
                     <div className="grid h-9 w-9 place-items-center rounded-md bg-primary/10 text-primary"><ClipboardList className="h-4 w-4" /></div>
                     <div>
                       <div className="font-medium">{s.title}</div>

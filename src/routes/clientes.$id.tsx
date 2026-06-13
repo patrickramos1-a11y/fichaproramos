@@ -75,6 +75,7 @@ export const Route = createFileRoute("/clientes/$id")({
 
 type ClientDocRow = {
   surveyId: string;
+  clientId: string;
   surveyTitle: string;
   purposeList: SurveyPurpose[];
   attachment: Attachment;
@@ -130,6 +131,7 @@ function ClienteDetail() {
         const attachments = moduleEntries.flatMap(([moduleId, state]) =>
           (state.attachments ?? []).map((attachment) => ({
             surveyId: survey.id,
+            clientId: survey.clientId,
             surveyTitle: survey.title,
             purposeList: survey.purposes ?? [],
             attachment,
@@ -503,7 +505,7 @@ function ClienteDetail() {
                   </div>
                   <div className="flex items-center gap-2">
                     <StatusBadge status={pendencia.status} />
-                    <Link to="/levantamentos/$id" params={{ id: survey.id }} search={{ mode: "edit" }}>
+                    <Link to="/clientes/$id/levantamentos/$surveyId" params={{ id: survey.clientId, surveyId: survey.id }}>
                       <Button variant="outline" size="sm">Abrir</Button>
                     </Link>
                   </div>
@@ -530,7 +532,7 @@ function ClienteDetail() {
                       <span>{formatDate(doc.createdAt)}</span>
                     </div>
                   </div>
-                  <Link to="/levantamentos/$id/resumo" params={{ id: doc.surveyId }}>
+                  <Link to="/clientes/$id/levantamentos/$surveyId" params={{ id: doc.clientId, surveyId: doc.surveyId }}>
                     <Button variant="outline" size="sm">Ver relatorio</Button>
                   </Link>
                 </CardContent>
@@ -977,17 +979,17 @@ function SurveyMainRow({
                 Campo
               </Button>
             </Link>
-            <Link to="/levantamentos/$id/resumo" params={{ id: row.survey.id }}>
+            <Link to="/clientes/$id/levantamentos/$surveyId" params={{ id: row.survey.clientId, surveyId: row.survey.id }}>
               <Button variant="outline" size="sm" className="w-full">
                 Relatorio
               </Button>
             </Link>
-            <Link to="/levantamentos/$id/resumo" params={{ id: row.survey.id }}>
+            <Link to="/clientes/$id/levantamentos/$surveyId" params={{ id: row.survey.clientId, surveyId: row.survey.id }}>
               <Button variant="outline" size="sm" className="w-full">
                 Documentos
               </Button>
             </Link>
-            <Link to="/levantamentos/$id" params={{ id: row.survey.id }} search={{ mode: "read" }}>
+            <Link to="/clientes/$id/levantamentos/$surveyId" params={{ id: row.survey.clientId, surveyId: row.survey.id }}>
               <Button variant="outline" size="sm" className="w-full">
                 Pendencias
               </Button>
@@ -1010,7 +1012,7 @@ function SurveyCompactRow({
   };
 }) {
   return (
-    <Link to="/levantamentos/$id/resumo" params={{ id: row.survey.id }}>
+    <Link to="/clientes/$id/levantamentos/$surveyId" params={{ id: row.survey.clientId, surveyId: row.survey.id }}>
       <div className="rounded-lg border p-3 transition-colors hover:border-primary/40">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
@@ -1028,7 +1030,7 @@ function SurveyCompactRow({
 
 function DocCompactRow({ row }: { row: ClientDocRow }) {
   return (
-    <Link to="/levantamentos/$id/resumo" params={{ id: row.surveyId }}>
+    <Link to="/clientes/$id/levantamentos/$surveyId" params={{ id: row.clientId, surveyId: row.surveyId }}>
       <div className="rounded-lg border p-3 transition-colors hover:border-primary/40">
         <div className="font-medium break-words">{row.attachment.name}</div>
         <div className="text-xs text-muted-foreground break-words">

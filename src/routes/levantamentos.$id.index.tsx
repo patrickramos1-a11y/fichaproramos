@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
-import { useCallback, useEffect, useMemo, useState, lazy, Suspense, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import {
   useDBSelector, updateModule, setFieldValue, setFieldStatus, addAttachment,
   removeAttachment, addPendencia, removePendencia, setFieldNote, setFieldNA,
@@ -19,7 +19,7 @@ import {
   ArrowLeft, FileText, Paperclip, Plus, Trash2, AlertTriangle, CheckCircle2,
   FileDown, Settings2, Files, ClipboardList, Signature, ChevronRight, Ban, Check, EyeOff,
   Lock, Unlock, Clock, Save, MessageSquarePlus,
-  BookOpen, ListChecks, Share2,
+  ListChecks, Share2,
 } from "lucide-react";
 import {
   shouldShowField, CENTRAL_TAB_MODULES,
@@ -35,11 +35,7 @@ import { GeometryManager } from "@/components/geom/GeometryManager";
 import type { SurveyGeometry } from "@/lib/geometryTypes";
 import { statusOutlineStyle } from "@/lib/colors";
 import { FinalidadeCard } from "@/components/FinalidadeCard";
-import { VisaoConsolidada } from "@/components/survey/VisaoConsolidada";
 import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
-const RelatorioDetalhado = lazy(() =>
-  import("@/components/survey/RelatorioDetalhado").then((m) => ({ default: m.RelatorioDetalhado })),
-);
 
 export const Route = createFileRoute("/levantamentos/$id/")({
   component: SurveyEditor,
@@ -52,7 +48,6 @@ type VirtualTab = "__documentos" | "__pendencias" | "__encerramento";
 
 function SurveyEditor() {
   const { id } = Route.useParams();
-  const { mode } = Route.useSearch();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const { hydrated, persistPending, persistenceError } = useDBStatus();
@@ -103,20 +98,16 @@ function SurveyEditor() {
       setActiveTab={setActiveTab}
       persistPending={persistPending}
       persistenceError={persistenceError}
-      mode={mode}
     />
   );
 }
 
-function SurveyEditorReady({ survey, projectName, clientName, activeTab, setActiveTab, persistPending, persistenceError, mode }: {
-  survey: any; projectName: string; clientName: string; activeTab: string; setActiveTab: (t: string) => void; persistPending?: boolean; persistenceError?: string; mode: "read" | "edit";
+function SurveyEditorReady({ survey, projectName, clientName, activeTab, setActiveTab, persistPending, persistenceError }: {
+  survey: any; projectName: string; clientName: string; activeTab: string; setActiveTab: (t: string) => void; persistPending?: boolean; persistenceError?: string;
 }) {
-  // No modo operacional ("edit", vindo da aba Levantamentos), o foco é preencher.
-  // No modo leitura ("read", vindo da página do cliente/projeto), o foco é consultar.
-  const [view, setView] = useState<"consolidada" | "relatorio" | "editor" | "anexos" | "pendencias">(
-    mode === "read" ? "consolidada" : "editor",
-  );
-  const isReadMode = mode === "read";
+  // Esta rota agora é exclusivamente operacional: preencher em campo.
+  // Consulta, visão consolidada e relatório detalhado ficam em /clientes/:id/levantamentos/:surveyId.
+  const [view, setView] = useState<"editor" | "anexos" | "pendencias">("editor");
   const allModules = useEffectiveModulesForSurvey(survey);
   const enabled: string[] = survey.enabledModules ?? allModules.map((m: any) => m.id);
   const enabledSet = useMemo(() => new Set(enabled), [enabled]);
@@ -196,77 +187,59 @@ function SurveyEditorReady({ survey, projectName, clientName, activeTab, setActi
             <Share2 className="h-4 w-4" />
           </Button>
           {survey.closedAt && (
-            <Link to="/levantamentos/$id/resumo" params={{ id: survey.id }}>
+            <Link to="/clientes/$id/levantamentos/$surveyId" params={{ id: survey.clientId, surveyId: survey.id }}>
               <Button variant="ghost" size="icon" className="h-8 w-8" title="Ver resumo final"><FileDown className="h-4 w-4" /></Button>
             </Link>
           )}
         </div>
       </div>
 
-      {isReadMode ? (
-        <div className="mb-3 flex items-center gap-1 border-b border-border overflow-x-auto">
-          {([
-            { id: "consolidada", label: "Visão Consolidada" },
-            { id: "relatorio", label: "Relatório Detalhado" },
-            { id: "editor", label: "Editar por módulos" },
-            { id: "anexos", label: "Fotos & Documentos" },
-            { id: "pendencias", label: "Pendências" },
-          ] as const).map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setView(t.id)}
-              className={`px-3 py-1.5 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${view === t.id ? "border-primary text-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      ) : (
-        // Modo operacional: foco em preencher. Visão/Relatório como ações secundárias.
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-muted-foreground mr-1 inline-flex items-center gap-1">
-            <ListChecks className="h-3 w-3" /> Preenchimento do levantamento
-          </span>
-          <Button
-            size="sm"
-            variant={view === "consolidada" ? "secondary" : "ghost"}
-            className="h-7 text-xs"
-            onClick={() => setView(view === "consolidada" ? "editor" : "consolidada")}
-            title="Ver visão consolidada"
-          >
-            <BookOpen className="h-3.5 w-3.5 mr-1" /> Consolidada
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] text-muted-foreground mr-1 inline-flex items-center gap-1">
+          <ListChecks className="h-3 w-3" /> Preenchimento do levantamento
+        </span>
+        <Button
+          size="sm"
+          variant={view === "editor" ? "secondary" : "ghost"}
+          className="h-7 text-xs"
+          onClick={() => setView("editor")}
+        >
+          Campo
+        </Button>
+        <Button
+          size="sm"
+          variant={view === "anexos" ? "secondary" : "ghost"}
+          className="h-7 text-xs"
+          onClick={() => setView("anexos")}
+        >
+          <Paperclip className="h-3.5 w-3.5 mr-1" /> Docs
+        </Button>
+        <Button
+          size="sm"
+          variant={view === "pendencias" ? "secondary" : "ghost"}
+          className="h-7 text-xs"
+          onClick={() => setView("pendencias")}
+        >
+          <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Pend.
+        </Button>
+        <Link to="/clientes/$id/levantamentos/$surveyId" params={{ id: survey.clientId, surveyId: survey.id }} className="ml-auto">
+          <Button size="sm" variant="ghost" className="h-7 text-xs">
+            Ver consulta
           </Button>
-          {survey.closedAt && (
-            <Button
-              size="sm"
-              variant={view === "relatorio" ? "secondary" : "ghost"}
-              className="h-7 text-xs"
-              onClick={() => setView(view === "relatorio" ? "editor" : "relatorio")}
-              title="Ver relatório detalhado"
-            >
-              <FileText className="h-3.5 w-3.5 mr-1" /> Relatório
-            </Button>
-          )}
+        </Link>
+      </div>
+
+      {view === "anexos" && (
+        <div className="mb-3">
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setView("editor")}>Voltar ao campo</Button>
         </div>
       )}
-
-      {view === "consolidada" && (
-        <VisaoConsolidada
-          surveyId={survey.id}
-          onOpenEditor={(modId) => { setView("editor"); if (modId) setActiveTab(modId); }}
-        />
-      )}
-
-      {view === "relatorio" && (
-        <Suspense fallback={<p className="text-sm text-muted-foreground">Carregando relatório…</p>}>
-          <RelatorioDetalhado
-            surveyId={survey.id}
-            onOpenEditor={(modId) => { setView("editor"); if (modId) setActiveTab(modId); }}
-          />
-        </Suspense>
-      )}
-
       {view === "anexos" && <DocumentsPanel survey={survey} />}
+      {view === "pendencias" && (
+        <div className="mb-3">
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setView("editor")}>Voltar ao campo</Button>
+        </div>
+      )}
       {view === "pendencias" && <PendenciasPanel survey={survey} />}
 
       {view === "editor" && (<>
@@ -1138,7 +1111,7 @@ function EncerramentoPanel({ survey }: { survey: any }) {
                 <Unlock className="h-4 w-4 mr-1" /> Reabrir
               </Button>
             )}
-            <Link to="/levantamentos/$id/resumo" params={{ id: survey.id }}>
+            <Link to="/clientes/$id/levantamentos/$surveyId" params={{ id: survey.clientId, surveyId: survey.id }}>
               <Button variant="outline"><FileDown className="h-4 w-4 mr-1" /> Ver resumo final</Button>
             </Link>
           </div>

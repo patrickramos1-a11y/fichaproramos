@@ -57,6 +57,7 @@ interface StoreRuntime {
   authBound: boolean;
   userId?: string;
   pendingFlush: boolean;
+  pendingDeletes: Partial<Record<TableName, Set<string>>>;
 }
 
 const EMPTY_DB: DB = {
@@ -190,6 +191,7 @@ const store: StoreRuntime = runtimeGlobal.__ramosStoreRuntime ??= {
   authBound: false,
   pendingFlush: false,
   lastSyncedDb: EMPTY_DB,
+  pendingDeletes: {},
 };
 
 function emit() {
@@ -294,16 +296,63 @@ async function diffTable<T extends { id: string }>(
     const prev = beforeMap.get(id);
     if (prev !== item) upserts.push(rowFor(table, item));
   }
-  const deletes: string[] = [];
-  for (const id of beforeMap.keys()) if (!afterMap.has(id)) deletes.push(id);
   if (upserts.length) {
     const { error } = await supabase.from(table).upsert(upserts);
     if (error) console.error(`[sync] upsert ${table}`, error);
   }
-  if (deletes.length) {
+}
+
+function markForDelete(table: TableName, ids: string[]) {
+  if (!ids.length) return;
+  const set = store.pendingDeletes[table] ?? new Set<string>();
+  ids.forEach((id) => set.add(id));
+  store.pendingDeletes[table] = set;
+}
+
+async function flushDeletes() {
+  const pending = store.pendingDeletes;
+  store.pendingDeletes = {};
+  const entries = Object.entries(pending) as [TableName, Set<string>][];
+  await Promise.all(entries.map(async ([table, ids]) => {
+    const deletes = Array.from(ids);
+    if (!deletes.length) return;
     const { error } = await supabase.from(table).delete().in("id", deletes);
-    if (error) console.error(`[sync] delete ${table}`, error);
+    if (error) {
+      markForDelete(table, deletes);
+      console.error(`[sync] delete ${table}`, error);
+    }
+  }));
+}
+
+async function selectAllData(table: TableName) {
+  const pageSize = 1000;
+  const rows: any[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const to = from + pageSize - 1;
+    const { data, error } = await supabase
+      .from(table)
+      .select("data")
+      .order("updated_at", { ascending: false })
+      .range(from, to);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if (!data || data.length < pageSize) break;
   }
+  return rows;
+}
+
+async function selectOptionalAllData(table: TableName) {
+  try {
+    return { data: await selectAllData(table), error: undefined };
+  } catch (error) {
+    return { data: [] as any[], error: error as Error };
+  }
+}
+
+async function selectFormOverrides() {
+  const { data, error } = await supabase.from("form_overrides").select("data").eq("id", "singleton").maybeSingle();
+  if (error) throw error;
+  return data?.data ?? {};
 }
 
 async function flushSync() {
@@ -324,6 +373,7 @@ async function flushSync() {
       syncJobs.push(diffTable("annual_environmental_records", before.annualRecords, after.annualRecords));
     }
     await Promise.all(syncJobs);
+    await flushDeletes();
     if (before.formOverrides !== after.formOverrides) {
       const { error } = await supabase.from("form_overrides").upsert({ id: "singleton", data: after.formOverrides as any });
       if (error) console.error("[sync] upsert form_overrides", error);
@@ -446,14 +496,14 @@ function unsubscribeRealtime() {
 
 async function fetchAll(): Promise<DB> {
   const [clients, emp, projects, surveys, templates, custom, annual, fo] = await Promise.all([
-    supabase.from("clients").select("data"),
-    supabase.from("empreendimentos").select("data"),
-    supabase.from("projects").select("data"),
-    supabase.from("surveys").select("data"),
-    supabase.from("survey_templates").select("data"),
-    supabase.from("custom_survey_types").select("data"),
-    supabase.from("annual_environmental_records").select("data"),
-    supabase.from("form_overrides").select("data").eq("id", "singleton").maybeSingle(),
+    selectAllData("clients"),
+    selectAllData("empreendimentos"),
+    selectAllData("projects"),
+    selectAllData("surveys"),
+    selectAllData("survey_templates"),
+    selectAllData("custom_survey_types"),
+    selectOptionalAllData("annual_environmental_records"),
+    selectFormOverrides(),
   ]);
   annualRecordsRemoteUnavailable = !!annual.error;
   annualRecordsRemoteError = annual.error?.message;
@@ -461,14 +511,14 @@ async function fetchAll(): Promise<DB> {
     console.warn("[sync] annual_environmental_records unavailable; using local snapshot fallback when possible.", annual.error);
   }
   return normalizeDB({
-    clients: (clients.data ?? []).map((r: any) => r.data),
-    empreendimentos: (emp.data ?? []).map((r: any) => r.data),
-    projects: (projects.data ?? []).map((r: any) => r.data),
-    surveys: (surveys.data ?? []).map((r: any) => r.data),
-    templates: (templates.data ?? []).map((r: any) => r.data),
-    customSurveyTypes: (custom.data ?? []).map((r: any) => r.data),
+    clients: clients.map((r: any) => r.data),
+    empreendimentos: emp.map((r: any) => r.data),
+    projects: projects.map((r: any) => r.data),
+    surveys: surveys.map((r: any) => r.data),
+    templates: templates.map((r: any) => r.data),
+    customSurveyTypes: custom.map((r: any) => r.data),
     annualRecords: (annual.data ?? []).map((r: any) => r.data),
-    formOverrides: (fo.data?.data ?? {}) as FormStructureOverrides,
+    formOverrides: fo as FormStructureOverrides,
   });
 }
 
@@ -740,6 +790,15 @@ export function updateClient(cid: string, data: Partial<Client>) {
 export function deleteClient(cid: string) {
   const remainingProjects = store.db.projects.filter((project) => project.clientId !== cid);
   const remainingProjectIds = new Set(remainingProjects.map((project) => project.id));
+  const deletedEmpreendimentos = store.db.empreendimentos.filter((empreendimento) => empreendimento.clientId === cid).map((entry) => entry.id);
+  const deletedProjects = store.db.projects.filter((project) => project.clientId === cid).map((entry) => entry.id);
+  const deletedAnnualRecords = store.db.annualRecords.filter((record) => record.clientId === cid).map((entry) => entry.id);
+  const deletedSurveys = store.db.surveys
+    .filter((survey) => {
+      if (survey.clientId === cid) return true;
+      return survey.projectId ? !remainingProjectIds.has(survey.projectId) : false;
+    })
+    .map((entry) => entry.id);
 
   store.db = {
     ...store.db,
@@ -752,6 +811,11 @@ export function deleteClient(cid: string) {
       return survey.projectId ? remainingProjectIds.has(survey.projectId) : true;
     }),
   };
+  markForDelete("clients", [cid]);
+  markForDelete("empreendimentos", deletedEmpreendimentos);
+  markForDelete("projects", deletedProjects);
+  markForDelete("annual_environmental_records", deletedAnnualRecords);
+  markForDelete("surveys", deletedSurveys);
   persist();
 }
 
@@ -777,6 +841,7 @@ export function deleteEmpreendimento(eid: string) {
     projects: store.db.projects.map((project) => (project.empreendimentoId === eid ? { ...project, empreendimentoId: undefined } : project)),
     surveys: store.db.surveys.map((survey) => (survey.empreendimentoId === eid ? { ...survey, empreendimentoId: undefined } : survey)),
   };
+  markForDelete("empreendimentos", [eid]);
   persist();
 }
 
@@ -793,6 +858,7 @@ export function deleteProject(pid: string) {
     projects: store.db.projects.filter((project) => project.id !== pid),
     surveys: store.db.surveys.map((survey) => (survey.projectId === pid ? { ...survey, projectId: undefined } : survey)),
   };
+  markForDelete("projects", [pid]);
   persist();
 }
 
@@ -1052,6 +1118,7 @@ export function revokeSurveyPublicShare(sid: string) {
 
 export function deleteSurvey(sid: string) {
   store.db = { ...store.db, surveys: store.db.surveys.filter((survey) => survey.id !== sid) };
+  markForDelete("surveys", [sid]);
   persist();
 }
 
@@ -1081,6 +1148,7 @@ export function deleteAnnualEnvironmentalRecord(recordId: string) {
     ...store.db,
     annualRecords: store.db.annualRecords.filter((record) => record.id !== recordId),
   };
+  markForDelete("annual_environmental_records", [recordId]);
   saveAnnualRecordsLocalFallback(store.userId);
   persist();
 }
@@ -1427,6 +1495,7 @@ export function updateTemplate(tid: string, patch: Partial<Omit<SurveyTemplate, 
 
 export function removeTemplate(tid: string) {
   store.db = { ...store.db, templates: (store.db.templates ?? []).filter((t) => t.id !== tid) };
+  markForDelete("survey_templates", [tid]);
   persist();
 }
 
@@ -1717,6 +1786,7 @@ export function deleteCustomSurveyType(id: string) {
     ...store.db,
     customSurveyTypes: (store.db.customSurveyTypes ?? []).filter((c) => c.id !== id),
   };
+  markForDelete("custom_survey_types", [id]);
   persist();
 }
 

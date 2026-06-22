@@ -208,10 +208,11 @@ function PhotoItemRow({
                 <button
                   type="button"
                   onClick={() => removeAttachment(surveyId, PHOTOS_MOD, att.id)}
-                  className="absolute right-1 top-1 rounded bg-black/60 p-0.5 text-white opacity-0 transition group-hover:opacity-100"
-                  aria-label="Remover imagem"
+                  className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded bg-black/70 text-white shadow-sm transition hover:bg-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`Remover imagem ${att.name}`}
+                  title="Remover imagem"
                 >
-                  <Trash2 className="h-3 w-3" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>

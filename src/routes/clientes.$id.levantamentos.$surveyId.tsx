@@ -11,6 +11,7 @@ import { useDBSelector, useEffectiveModulesForSurvey, useSurveyTypeMeta, reopenS
 import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
 import { ArrowLeft, ClipboardList, ExternalLink, Files, AlertTriangle, RotateCcw } from "lucide-react";
 import type { Attachment, Pendencia } from "@/lib/types";
+import { attachmentSrc } from "@/lib/attachments";
 
 const RelatorioDetalhado = lazy(() =>
   import("@/components/survey/RelatorioDetalhado").then((m) => ({ default: m.RelatorioDetalhado })),
@@ -178,8 +179,8 @@ function DocumentsView({ docs }: { docs: Array<{ moduleId: string; moduleTitle: 
                 {moduleTitle} · {attachment.type || "arquivo"} · {attachment.createdAt ? new Date(attachment.createdAt).toLocaleDateString("pt-BR") : "sem data"}
               </div>
             </div>
-            {attachment.dataUrl && (
-              <a href={attachment.dataUrl} download={attachment.name} className="text-sm text-primary hover:underline">
+            {attachmentSrc(attachment) && (
+              <a href={attachmentSrc(attachment)} download={attachment.name} className="text-sm text-primary hover:underline">
                 Baixar
               </a>
             )}

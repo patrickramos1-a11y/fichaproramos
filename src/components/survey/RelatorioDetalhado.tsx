@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
 import { statusOutlineStyle } from "@/lib/colors";
+import { attachmentSrc } from "@/lib/attachments";
 
 export function RelatorioDetalhado({ surveyId, onOpenEditor }: { surveyId: string; onOpenEditor: (moduleId?: string) => void }) {
   const data = useDBSelector(
@@ -172,7 +173,7 @@ export function RelatorioDetalhado({ surveyId, onOpenEditor }: { surveyId: strin
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-4">
             {report.attachments.photos.slice(0, 18).map((p) => (
               <div key={p.att.id} title={`${p.att.name} · ${p.moduleTitle}`} className="aspect-square rounded-md overflow-hidden border border-border">
-                <img src={p.att.dataUrl} alt={p.att.name} className="w-full h-full object-cover" />
+                <img src={attachmentSrc(p.att)} alt={p.att.name} className="w-full h-full object-cover" />
               </div>
             ))}
           </div>

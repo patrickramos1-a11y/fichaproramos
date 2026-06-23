@@ -34,6 +34,8 @@ type PublicPayload = {
   formOverrides?: FormStructureOverrides | null;
 };
 
+const USE_D1_BACKEND = import.meta.env.VITE_DATA_BACKEND === "d1";
+
 function PublicSurveyFill() {
   const { token } = Route.useParams();
   const [payload, setPayload] = useState<PublicPayload | null>(null);
@@ -49,7 +51,13 @@ function PublicSurveyFill() {
     async function load() {
       setLoading(true);
       setError("");
-      const { data, error: rpcError } = await (supabase as any).rpc("get_public_survey", { p_token: token });
+      const result = USE_D1_BACKEND
+        ? await fetch(`/api/public-survey/${encodeURIComponent(token)}`).then(async (response) => ({
+            data: response.ok ? await response.json() : null,
+            error: response.ok ? null : new Error(await response.text()),
+          }))
+        : await (supabase as any).rpc("get_public_survey", { p_token: token });
+      const { data, error: rpcError } = result;
       if (cancelled) return;
       if (rpcError) {
         setError(
@@ -134,15 +142,26 @@ function PublicSurveyFill() {
   async function save() {
     if (!payload) return;
     setSaving(true);
-    const { data, error: rpcError } = await (supabase as any).rpc("update_public_survey", {
-      p_token: token,
-      p_patch: {
-        modules: payload.survey.modules,
-        pendencias: payload.survey.pendencias ?? [],
-        signatures: payload.survey.signatures ?? {},
-      },
-      p_editor_name: editorName.trim() || null,
-    });
+    const patch = {
+      modules: payload.survey.modules,
+      pendencias: payload.survey.pendencias ?? [],
+      signatures: payload.survey.signatures ?? {},
+    };
+    const result = USE_D1_BACKEND
+      ? await fetch(`/api/public-survey/${encodeURIComponent(token)}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ patch, editorName: editorName.trim() || null }),
+        }).then(async (response) => ({
+          data: response.ok ? await response.json() : null,
+          error: response.ok ? null : new Error(await response.text()),
+        }))
+      : await (supabase as any).rpc("update_public_survey", {
+          p_token: token,
+          p_patch: patch,
+          p_editor_name: editorName.trim() || null,
+        });
+    const { data, error: rpcError } = result;
     setSaving(false);
     if (rpcError) {
       toast.error(rpcError.message || "Nao foi possivel salvar.");

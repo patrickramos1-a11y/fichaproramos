@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Database, Wifi, WifiOff, Loader2, RotateCw } from "lucide-react";
-import { useDBStatus } from "@/lib/store";
+import { retryPendingSync, useDBStatus } from "@/lib/store";
 
 export function OfflineIndicator() {
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
@@ -34,9 +34,19 @@ export function OfflineIndicator() {
           title={status.persistenceError || status.annualRecordsError || ""}
         >
           {!online ? <><WifiOff className="h-3.5 w-3.5 text-warn-foreground" /><span className="text-warn-foreground">Offline</span></>
-            : status.persistPending ? <><Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /><span className="text-muted-foreground">Salvando…</span></>
             : status.persistenceError ? <><Wifi className="h-3.5 w-3.5 text-destructive" /><span className="text-destructive">Erro de sincronia</span></>
+            : status.persistPending ? <><Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /><span className="text-muted-foreground">Salvando…</span></>
             : <><Database className="h-3.5 w-3.5 text-amber-700" /><span className="text-amber-700">Banco anual nao configurado</span></>}
+          {status.persistenceError && online && (
+            <button
+              type="button"
+              onClick={retryPendingSync}
+              className="ml-1 rounded border px-1.5 py-0.5 text-[11px] text-destructive hover:bg-destructive/10"
+              title={`Tentar reenviar ${status.pendingOperations ?? 0} operacao(oes) pendente(s)`}
+            >
+              Tentar novamente
+            </button>
+          )}
         </div>
       )}
       <button

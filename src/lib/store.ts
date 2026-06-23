@@ -23,7 +23,17 @@ import { defaultTemplateKeyFor, photoScopedOverridesForTemplate } from "./photoC
 import { normalizeAnnualEnvironmentalRecord } from "./annualEnvironmental";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { saveSnapshot, loadSnapshot, clearSnapshot } from "./offlineSnapshot";
+import {
+  saveSnapshot,
+  loadSnapshot,
+  clearSnapshot,
+  enqueueSyncOperations,
+  listSyncOperations,
+  markSyncOperationsFailed,
+  removeSyncOperations,
+  type SyncOperation,
+  type SyncOperationType,
+} from "./offlineSnapshot";
 
 interface DB {
   clients: Client[];
@@ -43,6 +53,8 @@ interface DBStatus {
   authed: boolean;
   annualRecordsAvailable?: boolean;
   annualRecordsError?: string;
+  pendingOperations?: number;
+  lastSyncErrorAt?: string;
 }
 
 interface StoreRuntime {
@@ -225,6 +237,7 @@ function syncGlobalOverrides() {
 
 /* =================== Supabase sync =================== */
 
+const USE_D1_BACKEND = import.meta.env.VITE_DATA_BACKEND === "d1";
 let annualRecordsRemoteUnavailable = false;
 let annualRecordsRemoteError: string | undefined;
 const ANNUAL_RECORDS_LOCAL_PREFIX = "ramos-annual-records:";
@@ -284,6 +297,28 @@ function rowFor(table: TableName, item: any): Record<string, any> {
   }
 }
 
+function syncOperationId(type: SyncOperationType, table: string, recordId: string) {
+  return `${type}:${table}:${recordId}`;
+}
+
+function syncOperation(type: SyncOperationType, table: string, recordId: string, payload?: unknown): SyncOperation {
+  return {
+    operationId: syncOperationId(type, table, recordId),
+    table,
+    recordId,
+    type,
+    payload,
+    createdAt: new Date().toISOString(),
+    attempts: 0,
+  };
+}
+
+async function refreshPendingOperationsStatus() {
+  const pendingOperations = (await listSyncOperations()).length;
+  store.status = { ...store.status, pendingOperations };
+  emit();
+}
+
 async function diffTable<T extends { id: string }>(
   table: TableName,
   before: T[],
@@ -292,13 +327,20 @@ async function diffTable<T extends { id: string }>(
   const beforeMap = new Map(before.map((x) => [x.id, x]));
   const afterMap = new Map(after.map((x) => [x.id, x]));
   const upserts: any[] = [];
+  const operations: SyncOperation[] = [];
   for (const [id, item] of afterMap) {
     const prev = beforeMap.get(id);
-    if (prev !== item) upserts.push(rowFor(table, item));
+    if (prev !== item) {
+      const row = rowFor(table, item);
+      upserts.push(row);
+      operations.push(syncOperation("upsert", table, id, row));
+    }
   }
   if (upserts.length) {
+    await enqueueSyncOperations(operations);
     const { error } = await supabase.from(table).upsert(upserts);
-    if (error) console.error(`[sync] upsert ${table}`, error);
+    if (error) throw new Error(`[sync] upsert ${table}: ${error.message}`);
+    await removeSyncOperations(operations.map((operation) => operation.operationId));
   }
 }
 
@@ -316,11 +358,14 @@ async function flushDeletes() {
   await Promise.all(entries.map(async ([table, ids]) => {
     const deletes = Array.from(ids);
     if (!deletes.length) return;
+    const operations = deletes.map((id) => syncOperation("delete", table, id));
+    await enqueueSyncOperations(operations);
     const { error } = await supabase.from(table).delete().in("id", deletes);
     if (error) {
       markForDelete(table, deletes);
-      console.error(`[sync] delete ${table}`, error);
+      throw new Error(`[sync] delete ${table}: ${error.message}`);
     }
+    await removeSyncOperations(operations.map((operation) => operation.operationId));
   }));
 }
 
@@ -355,33 +400,105 @@ async function selectFormOverrides() {
   return data?.data ?? {};
 }
 
+function collectUpsertOperations<T extends { id: string }>(
+  table: TableName,
+  before: T[],
+  after: T[],
+) {
+  const beforeMap = new Map(before.map((x) => [x.id, x]));
+  return after
+    .filter((item) => beforeMap.get(item.id) !== item)
+    .map((item) => {
+      const row = rowFor(table, item);
+      return syncOperation("upsert", table, item.id, row);
+    });
+}
+
+async function authHeaders() {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function fetchD1DB(): Promise<DB> {
+  const response = await fetch("/api/db/bootstrap", { headers: await authHeaders() });
+  if (!response.ok) throw new Error(await response.text());
+  return normalizeDB(await response.json() as Partial<DB>);
+}
+
+async function flushD1Sync(before: DB, after: DB) {
+  const pending = store.pendingDeletes;
+  store.pendingDeletes = {};
+  const operations: SyncOperation[] = [
+    ...collectUpsertOperations("clients", before.clients, after.clients),
+    ...collectUpsertOperations("empreendimentos", before.empreendimentos, after.empreendimentos),
+    ...collectUpsertOperations("projects", before.projects, after.projects),
+    ...collectUpsertOperations("surveys", before.surveys, after.surveys),
+    ...collectUpsertOperations("survey_templates", before.templates, after.templates),
+    ...collectUpsertOperations("custom_survey_types", before.customSurveyTypes, after.customSurveyTypes),
+    ...collectUpsertOperations("annual_environmental_records", before.annualRecords, after.annualRecords),
+  ];
+  if (before.formOverrides !== after.formOverrides) {
+    operations.push(syncOperation("upsert", "form_overrides", "singleton", { id: "singleton", data: after.formOverrides }));
+  }
+  for (const [table, ids] of Object.entries(pending) as [TableName, Set<string>][]) {
+    for (const id of ids) operations.push(syncOperation("delete", table, id));
+  }
+  if (!operations.length) return;
+  await enqueueSyncOperations(operations);
+  const response = await fetch("/api/db/sync", {
+    method: "POST",
+    headers: { "content-type": "application/json", ...(await authHeaders()) },
+    body: JSON.stringify({ operations }),
+  });
+  if (!response.ok) {
+    for (const [table, ids] of Object.entries(pending) as [TableName, Set<string>][]) {
+      markForDelete(table, Array.from(ids));
+    }
+    throw new Error(await response.text());
+  }
+  const result = await response.json() as { applied?: string[]; failed?: Array<{ operationId: string; error: string }> };
+  if (result.failed?.length) {
+    throw new Error(result.failed.map((failure) => failure.error).join("; "));
+  }
+  await removeSyncOperations(result.applied ?? operations.map((operation) => operation.operationId));
+}
+
 async function flushSync() {
   if (!store.userId) return;
   const before = store.lastSyncedDb;
   const after = store.db;
-  store.lastSyncedDb = after;
   try {
-    const syncJobs = [
-      diffTable("clients", before.clients, after.clients),
-      diffTable("empreendimentos", before.empreendimentos, after.empreendimentos),
-      diffTable("projects", before.projects, after.projects),
-      diffTable("surveys", before.surveys, after.surveys),
-      diffTable("survey_templates", before.templates, after.templates),
-      diffTable("custom_survey_types", before.customSurveyTypes, after.customSurveyTypes),
-    ];
-    if (!annualRecordsRemoteUnavailable) {
-      syncJobs.push(diffTable("annual_environmental_records", before.annualRecords, after.annualRecords));
+    if (USE_D1_BACKEND) {
+      await flushD1Sync(before, after);
+    } else {
+      const syncJobs = [
+        diffTable("clients", before.clients, after.clients),
+        diffTable("empreendimentos", before.empreendimentos, after.empreendimentos),
+        diffTable("projects", before.projects, after.projects),
+        diffTable("surveys", before.surveys, after.surveys),
+        diffTable("survey_templates", before.templates, after.templates),
+        diffTable("custom_survey_types", before.customSurveyTypes, after.customSurveyTypes),
+      ];
+      if (!annualRecordsRemoteUnavailable) {
+        syncJobs.push(diffTable("annual_environmental_records", before.annualRecords, after.annualRecords));
+      }
+      await Promise.all(syncJobs);
+      await flushDeletes();
+      if (before.formOverrides !== after.formOverrides) {
+        const operation = syncOperation("upsert", "form_overrides", "singleton", { id: "singleton", data: after.formOverrides });
+        await enqueueSyncOperations([operation]);
+        const { error } = await supabase.from("form_overrides").upsert({ id: "singleton", data: after.formOverrides as any });
+        if (error) throw new Error(`[sync] upsert form_overrides: ${error.message}`);
+        await removeSyncOperations([operation.operationId]);
+      }
     }
-    await Promise.all(syncJobs);
-    await flushDeletes();
-    if (before.formOverrides !== after.formOverrides) {
-      const { error } = await supabase.from("form_overrides").upsert({ id: "singleton", data: after.formOverrides as any });
-      if (error) console.error("[sync] upsert form_overrides", error);
-    }
+    store.lastSyncedDb = after;
     store.status = {
       ...store.status,
       persistPending: false,
       persistenceError: undefined,
+      lastSyncErrorAt: undefined,
       annualRecordsAvailable: !annualRecordsRemoteUnavailable,
       annualRecordsError: annualRecordsRemoteError,
     };
@@ -391,12 +508,22 @@ async function flushSync() {
     }
   } catch (err) {
     console.error("[sync] flush failed", err);
-    store.status = { ...store.status, persistPending: false, persistenceError: "Falha ao sincronizar com o servidor." };
+    const message = err instanceof Error ? err.message : "Falha ao sincronizar com o servidor.";
+    const pending = await listSyncOperations();
+    await markSyncOperationsFailed(pending.map((operation) => operation.operationId), message);
+    store.status = {
+      ...store.status,
+      persistPending: true,
+      persistenceError: "Erro de sincronia. Seus dados continuam neste aparelho e serao reenviados.",
+      lastSyncErrorAt: new Date().toISOString(),
+      pendingOperations: pending.length,
+    };
     if (store.userId) {
       const uid = store.userId;
       idle(() => void saveSnapshot(uid, store.db));
     }
   }
+  void refreshPendingOperationsStatus();
   emit();
 }
 
@@ -415,6 +542,10 @@ function queueSync(immediate = false) {
   };
   if (immediate) schedule();
   else store.syncTimer = window.setTimeout(schedule, 700);
+}
+
+export function retryPendingSync() {
+  queueSync(true);
 }
 
 /* =================== Realtime in =================== */
@@ -495,6 +626,7 @@ function unsubscribeRealtime() {
 /* =================== Initial load =================== */
 
 async function fetchAll(): Promise<DB> {
+  if (USE_D1_BACKEND) return fetchD1DB();
   const [clients, emp, projects, surveys, templates, custom, annual, fo] = await Promise.all([
     selectAllData("clients"),
     selectAllData("empreendimentos"),
@@ -549,6 +681,11 @@ async function initForUser(userId: string) {
     seedFactoryCustomSurveyTypes();
     repairPhotoChecklistKeysForSurveys();
     void saveSnapshot(userId, store.db);
+    const pendingOperations = (await listSyncOperations()).length;
+    if (pendingOperations > 0) {
+      store.status = { ...store.status, persistPending: true, pendingOperations };
+      queueSync(true);
+    }
   } catch (err) {
     console.error("[sync] initial load failed", err);
     // Tenta recuperar do snapshot offline
@@ -561,6 +698,8 @@ async function initForUser(userId: string) {
       seedFactoryCustomSurveyTypes();
       repairPhotoChecklistKeysForSurveys();
       store.status = { ...store.status, persistenceError: "Modo offline — usando dados locais." };
+      const pendingOperations = (await listSyncOperations()).length;
+      if (pendingOperations > 0) store.status = { ...store.status, persistPending: true, pendingOperations };
     } else {
       store.status = { ...store.status, persistenceError: "Falha ao carregar dados do servidor." };
     }
@@ -701,12 +840,20 @@ function repairPhotoChecklistKeysForSurveys() {
 
 function persist() {
   saveAnnualRecordsLocalFallback(store.userId);
+  if (store.userId) {
+    const uid = store.userId;
+    idle(() => void saveSnapshot(uid, store.db));
+  }
   queueSync();
   scheduleEmit();
 }
 
 function persistImmediate() {
   saveAnnualRecordsLocalFallback(store.userId);
+  if (store.userId) {
+    const uid = store.userId;
+    idle(() => void saveSnapshot(uid, store.db));
+  }
   queueSync(true);
   scheduleEmit();
 }
@@ -1158,6 +1305,7 @@ export function bulkDeleteSurveys(sids: string[]) {
   if (!sids.length) return;
   const set = new Set(sids);
   store.db = { ...store.db, surveys: store.db.surveys.filter((s) => !set.has(s.id)) };
+  markForDelete("surveys", sids);
   persist();
 }
 

@@ -36,6 +36,7 @@ import type { SurveyGeometry } from "@/lib/geometryTypes";
 import { statusOutlineStyle } from "@/lib/colors";
 import { FinalidadeCard } from "@/components/FinalidadeCard";
 import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
+import { attachmentFromFile, attachmentSrc } from "@/lib/attachments";
 
 export const Route = createFileRoute("/levantamentos/$id/")({
   component: SurveyEditor,
@@ -862,15 +863,15 @@ function DocumentsPanel({ survey }: { survey: any }) {
   function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const files = e.target.files; if (!files) return;
     Array.from(files).forEach((f) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        addAttachment(survey.id, "documentos", {
-          id: Math.random().toString(36).slice(2, 11),
-          name: f.name, type: f.type, dataUrl: reader.result as string,
-          createdAt: new Date().toISOString(), moduleTag: "documentos",
-        });
-      };
-      reader.readAsDataURL(f);
+      const attId = Math.random().toString(36).slice(2, 11);
+      attachmentFromFile(f, {
+        id: attId,
+        surveyId: survey.id,
+        createdAt: new Date().toISOString(),
+        moduleTag: "documentos",
+        category: "Documentos",
+        origin: "upload",
+      }).then((attachment) => addAttachment(survey.id, "documentos", attachment));
     });
     e.target.value = "";
   }
@@ -893,14 +894,14 @@ function DocumentsPanel({ survey }: { survey: any }) {
               {allAttachments.map(({ moduleId, moduleTitle, att }) => (
                 <div key={att.id} className="flex items-center gap-2 rounded-md border border-border p-2">
                   {att.type.startsWith("image/") ? (
-                    <img src={att.dataUrl} alt={att.name} className="h-12 w-12 rounded object-cover" />
+                    <img src={attachmentSrc(att)} alt={att.name} className="h-12 w-12 rounded object-cover" />
                   ) : (
                     <div className="grid h-12 w-12 place-items-center rounded bg-secondary"><FileText className="h-5 w-5 text-muted-foreground" /></div>
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-medium truncate">{att.name}</div>
                     <div className="text-[10px] text-muted-foreground truncate">{moduleTitle}</div>
-                    <a href={att.dataUrl} download={att.name} className="text-xs text-primary">Baixar</a>
+                    <a href={attachmentSrc(att)} download={att.name} className="text-xs text-primary">Baixar</a>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => removeAttachment(survey.id, moduleId, att.id)}><Trash2 className="h-3 w-3" /></Button>
                 </div>

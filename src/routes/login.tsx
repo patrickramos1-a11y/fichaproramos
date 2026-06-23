@@ -23,6 +23,13 @@ const emailFor = (name: string) =>
     .replace(/(^-|-$)/g, "")}@app.local`;
 
 type AppUser = { id: string; name: string; email: string };
+const USE_D1_BACKEND = import.meta.env.VITE_DATA_BACKEND === "d1";
+
+async function authHeaders() {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -39,6 +46,13 @@ function LoginPage() {
   }, [navigate]);
 
   const loadUsers = async () => {
+    if (USE_D1_BACKEND) {
+      const response = await fetch("/api/app-users");
+      if (!response.ok) return toast.error("Nao foi possivel carregar os usuarios");
+      const data = await response.json() as { appUsers?: AppUser[] };
+      setUsers((data.appUsers ?? []) as AppUser[]);
+      return;
+    }
     const { data, error } = await supabase
       .from("app_users")
       .select("id, name, email")
@@ -86,12 +100,32 @@ function LoginPage() {
       setLoading(false);
       return toast.error(signInErr.message);
     }
-    const { error: insErr } = await supabase
-      .from("app_users")
-      .insert({ name, email });
-    if (insErr && !insErr.message.toLowerCase().includes("duplicate")) {
-      setLoading(false);
-      return toast.error(insErr.message);
+    if (USE_D1_BACKEND) {
+      const response = await fetch("/api/db/sync", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...(await authHeaders()) },
+        body: JSON.stringify({
+          operations: [{
+            operationId: `upsert:app_users:${email}`,
+            table: "app_users",
+            recordId: email,
+            type: "upsert",
+            payload: { id: email, name, email },
+          }],
+        }),
+      });
+      if (!response.ok) {
+        setLoading(false);
+        return toast.error(await response.text());
+      }
+    } else {
+      const { error: insErr } = await supabase
+        .from("app_users")
+        .insert({ name, email });
+      if (insErr && !insErr.message.toLowerCase().includes("duplicate")) {
+        setLoading(false);
+        return toast.error(insErr.message);
+      }
     }
     setLoading(false);
     toast.success(`Usuário ${name} criado!`);

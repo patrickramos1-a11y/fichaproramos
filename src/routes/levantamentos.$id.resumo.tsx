@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { PhotoAttachmentsPanel } from "@/components/PhotoAttachmentsPanel";
 import { useEffect, useState } from "react";
 import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
+import { attachmentSrc } from "@/lib/attachments";
 
 export const Route = createFileRoute("/levantamentos/$id/resumo")({
   component: ResumoPage,
@@ -139,7 +140,7 @@ function ResumoPage() {
                 {imageAttachments.length > 0 && (
                   <div className="mt-3 grid sm:grid-cols-3 gap-2">
                     {imageAttachments.map((a) => (
-                      <img key={a.id} src={a.dataUrl} alt={a.name} className="rounded-md border border-border h-32 w-full object-cover" />
+                      <img key={a.id} src={attachmentSrc(a)} alt={a.name} className="rounded-md border border-border h-32 w-full object-cover" />
                     ))}
                   </div>
                 )}

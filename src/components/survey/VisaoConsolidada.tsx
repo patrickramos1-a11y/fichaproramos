@@ -13,6 +13,7 @@ import {
 import { QuickEditDrawer, type QuickEditTarget } from "./QuickEditDrawer";
 import { getSurveyClient, getSurveyProject } from "@/lib/surveyRelations";
 import { statusOutlineStyle } from "@/lib/colors";
+import { attachmentSrc } from "@/lib/attachments";
 
 export function VisaoConsolidada({ surveyId, onOpenEditor }: { surveyId: string; onOpenEditor: (moduleId?: string) => void }) {
   const data = useDBSelector(
@@ -332,7 +333,7 @@ function AttachmentsThumbs({ overview }: { overview: ReturnType<typeof buildOver
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
             {photos.map(({ a, moduleTitle }) => (
               <div key={a.id} className="aspect-square rounded-md overflow-hidden border border-border" title={`${a.name} · ${moduleTitle}`}>
-                <img src={a.dataUrl} alt={a.name} className="w-full h-full object-cover" />
+                <img src={attachmentSrc(a)} alt={a.name} className="w-full h-full object-cover" />
               </div>
             ))}
           </div>

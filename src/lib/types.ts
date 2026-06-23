@@ -301,7 +301,9 @@ export interface Attachment {
   id: string;
   name: string;
   type: string;
-  dataUrl: string;
+  dataUrl?: string;
+  r2Key?: string;
+  size?: number;
   createdAt: string;
   /** Categoria livre para organização central (ex.: "Licenças", "Fotos"). */
   category?: string;

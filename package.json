@@ -8,6 +8,8 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
+    "data:export-supabase": "node scripts/export-supabase-for-d1.mjs",
+    "data:import-d1": "node scripts/import-d1-data.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

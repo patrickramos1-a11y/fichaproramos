@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Camera, ImagePlus, Trash2, AlertTriangle } from "lucide-react";
 import { addAttachment, removeAttachment, setPhotoNote } from "@/lib/store";
+import { attachmentFromFile, attachmentSrc } from "@/lib/attachments";
 import { PHOTO_CHECKLISTS, defaultTemplateKeyFor } from "@/lib/photoChecklists";
 import type { Attachment, ModuleState, Survey } from "@/lib/types";
 
@@ -11,15 +12,6 @@ const PHOTOS_MOD = "fotos";
 
 function id() {
   return Math.random().toString(36).slice(2, 11);
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }
 
 interface Props {
@@ -121,18 +113,16 @@ function PhotoItemRow({
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
     for (const file of files) {
-      const dataUrl = await readFileAsDataUrl(file);
-      addAttachment(surveyId, PHOTOS_MOD, {
-        id: id(),
-        name: file.name,
-        type: file.type || "image/*",
-        dataUrl,
+      const attId = id();
+      addAttachment(surveyId, PHOTOS_MOD, await attachmentFromFile(file, {
+        id: attId,
+        surveyId,
         createdAt: new Date().toISOString(),
         category: "Fotos",
         moduleTag: "fotos",
         photoItemId: composedId,
         origin,
-      });
+      }));
     }
     e.target.value = "";
   }
@@ -200,7 +190,7 @@ function PhotoItemRow({
           {attachments.map((att) => (
             <div key={att.id} className="group relative">
               <img
-                src={att.dataUrl}
+                src={attachmentSrc(att)}
                 alt={att.name}
                 className="h-20 w-full rounded border border-border object-cover"
               />

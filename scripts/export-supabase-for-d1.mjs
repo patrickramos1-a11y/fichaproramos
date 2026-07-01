@@ -1,6 +1,25 @@
 import { createClient } from "@supabase/supabase-js";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+async function loadEnvFile(filePath = ".env") {
+  try {
+    const content = await readFile(filePath, "utf8");
+    for (const line of content.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+      const [rawKey, ...rest] = trimmed.split("=");
+      const key = rawKey.trim();
+      if (!process.env[key]) {
+        process.env[key] = rest.join("=").trim().replace(/^['"]|['"]$/g, "");
+      }
+    }
+  } catch {
+    // .env is optional; CI can provide real environment variables.
+  }
+}
+
+await loadEnvFile();
 
 const tables = [
   "clients",
@@ -22,7 +41,10 @@ const serviceKey =
 
 if (!supabaseUrl || !serviceKey) {
   console.error(
-    "Missing SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.",
+    `Missing ${[
+      !supabaseUrl ? "SUPABASE_URL" : null,
+      !serviceKey ? "SUPABASE_SERVICE_ROLE_KEY" : null,
+    ].filter(Boolean).join(" and ")} environment variables.`,
   );
   process.exit(1);
 }

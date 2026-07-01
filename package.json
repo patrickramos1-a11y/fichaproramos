@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "data:export-supabase": "node scripts/export-supabase-for-d1.mjs",
     "data:import-d1": "node scripts/import-d1-data.mjs",
+    "data:verify-d1": "node scripts/verify-d1.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

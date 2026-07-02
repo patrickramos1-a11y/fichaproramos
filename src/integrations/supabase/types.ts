@@ -214,27 +214,33 @@ export type Database = {
       }
       surveys: {
         Row: {
+          client_id: string | null
           created_at: string
           created_by: string | null
           data: Json
+          empreendimento_id: string | null
           id: string
-          project_id: string
+          project_id: string | null
           updated_at: string
         }
         Insert: {
+          client_id?: string | null
           created_at?: string
           created_by?: string | null
           data: Json
+          empreendimento_id?: string | null
           id: string
-          project_id: string
+          project_id?: string | null
           updated_at?: string
         }
         Update: {
+          client_id?: string | null
           created_at?: string
           created_by?: string | null
           data?: Json
+          empreendimento_id?: string | null
           id?: string
-          project_id?: string
+          project_id?: string | null
           updated_at?: string
         }
         Relationships: []

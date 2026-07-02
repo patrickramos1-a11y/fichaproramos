@@ -25,7 +25,7 @@ const emailFor = (name: string) =>
 type AppUser = { id: string; name: string; email: string };
 const USE_D1_BACKEND = import.meta.env.VITE_DATA_BACKEND === "d1";
 
-async function authHeaders() {
+async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   return token ? { Authorization: `Bearer ${token}` } : {};

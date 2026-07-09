@@ -369,15 +369,22 @@ async function flushDeletes() {
   }));
 }
 
+// Surveys carregam fotos/anexos inline no jsonb (linhas podem ter MBs).
+// Paginar em blocos pequenos evita statement timeout do Postgres.
+const PAGE_SIZE_BY_TABLE: Partial<Record<TableName, number>> = {
+  surveys: 5,
+  annual_environmental_records: 20,
+};
+
 async function selectAllData(table: TableName) {
-  const pageSize = 1000;
+  const pageSize = PAGE_SIZE_BY_TABLE[table] ?? 1000;
   const rows: any[] = [];
   for (let from = 0; ; from += pageSize) {
     const to = from + pageSize - 1;
+    // Sem .order() para não forçar sort do jsonb inteiro; a UI já ordena localmente.
     const { data, error } = await supabase
       .from(table)
       .select("data")
-      .order("updated_at", { ascending: false })
       .range(from, to);
     if (error) throw error;
     rows.push(...(data ?? []));

@@ -890,33 +890,37 @@ export function useDBStatus() {
 }
 
 export function useDBSelector<T>(selector: (state: DB) => T, isEqual: (a: T, b: T) => boolean = Object.is) {
-  const [selected, setSelected] = useState(() => selector(store.db));
-  const selectedRef = useRef(selected);
+  // Refs keep the latest selector/equality without re-subscribing or
+  // re-running effects on every render (which caused a setState loop when
+  // callers passed inline selectors returning fresh arrays/objects).
   const selectorRef = useRef(selector);
   const isEqualRef = useRef(isEqual);
-
   selectorRef.current = selector;
   isEqualRef.current = isEqual;
 
-  useEffect(() => {
-    const next = selector(store.db);
-    if (!isEqualRef.current(selectedRef.current, next)) {
-      selectedRef.current = next;
-      setSelected(next);
+  const lastRef = useRef<{ db: DB; value: T }>({ db: store.db, value: selector(store.db) });
+
+  const getSnapshot = () => {
+    const db = store.db;
+    const prev = lastRef.current;
+    if (prev.db === db) return prev.value;
+    const next = selectorRef.current(db);
+    if (isEqualRef.current(prev.value, next)) {
+      lastRef.current = { db, value: prev.value };
+      return prev.value;
     }
-  }, [selector]);
+    lastRef.current = { db, value: next };
+    return next;
+  };
 
-  useEffect(() => {
-    return subscribe(() => {
-      const next = selectorRef.current(store.db);
-      if (!isEqualRef.current(selectedRef.current, next)) {
-        selectedRef.current = next;
-        setSelected(next);
-      }
-    });
-  }, []);
+  return useSyncExternalStore(subscribe, getSnapshot, () => lastRef.current.value);
+}
 
-  return selected;
+export function shallowArrayEqual<T>(a: readonly T[], b: readonly T[]) {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 const id = () => Math.random().toString(36).slice(2, 11);

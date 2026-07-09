@@ -46,12 +46,14 @@ if (typeof globalThis.addEventListener === "function") {
   globalThis.addEventListener("error", (event) => {
     const err = (event as ErrorEvent).error ?? event;
     record(err);
-    tryRecoverFromChunkError(err);
+    // Only auto-reload on stale-bundle (chunk load) errors. Normal runtime
+    // errors must NOT trigger a reload — that would erase user input.
+    if (isChunkLoadError(err)) tryRecoverFromChunkError(err);
   });
   globalThis.addEventListener("unhandledrejection", (event) => {
     const reason = (event as PromiseRejectionEvent).reason;
     record(reason);
-    tryRecoverFromChunkError(reason);
+    if (isChunkLoadError(reason)) tryRecoverFromChunkError(reason);
   });
 }
 

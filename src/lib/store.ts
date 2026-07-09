@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
 import type {
   Client, Empreendimento, Project, Survey, ModuleState, FieldStatus, Pendencia,
   SurveyType, Attachment, SurveyTemplate,

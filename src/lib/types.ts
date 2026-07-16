@@ -301,10 +301,16 @@ export interface Attachment {
   id: string;
   name: string;
   type: string;
+  /** Fallback local: usado apenas quando o upload para o Storage falhou/está pendente. */
   dataUrl?: string;
+  /** Legado (Cloudflare R2). Novos anexos usam `storagePath`. */
   r2Key?: string;
+  /** Caminho no bucket privado `survey-photos` do Supabase Storage. */
+  storagePath?: string;
   size?: number;
   createdAt: string;
+  /** Marca que o anexo ainda não foi enviado ao Storage e precisa ser retomado. */
+  pendingUpload?: boolean;
   /** Categoria livre para organização central (ex.: "Licenças", "Fotos"). */
   category?: string;
   /** Módulo de origem/contexto (opcional). */

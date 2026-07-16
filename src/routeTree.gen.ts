@@ -26,6 +26,7 @@ import { Route as LevantamentosIdResumoRouteImport } from './routes/levantamento
 import { Route as ConfiguracoesTiposTypeIdRouteImport } from './routes/configuracoes.tipos.$typeId'
 import { Route as ClientesIdLevantamentosSurveyIdRouteImport } from './routes/clientes.$id.levantamentos.$surveyId'
 import { Route as ClientesIdDadosAmbientaisRecordIdRouteImport } from './routes/clientes.$id.dados-ambientais.$recordId'
+import { Route as ApiPublicPhotoSplatRouteImport } from './routes/api/public/photo.$'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -115,6 +116,11 @@ const ClientesIdDadosAmbientaisRecordIdRoute =
     path: '/dados-ambientais/$recordId',
     getParentRoute: () => ClientesIdRoute,
   } as any)
+const ApiPublicPhotoSplatRoute = ApiPublicPhotoSplatRouteImport.update({
+  id: '/api/public/photo/$',
+  path: '/api/public/photo/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -132,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes/tipos/$typeId': typeof ConfiguracoesTiposTypeIdRoute
   '/levantamentos/$id/resumo': typeof LevantamentosIdResumoRoute
   '/levantamentos/$id/': typeof LevantamentosIdIndexRoute
+  '/api/public/photo/$': typeof ApiPublicPhotoSplatRoute
   '/clientes/$id/dados-ambientais/$recordId': typeof ClientesIdDadosAmbientaisRecordIdRoute
   '/clientes/$id/levantamentos/$surveyId': typeof ClientesIdLevantamentosSurveyIdRoute
 }
@@ -150,6 +157,7 @@ export interface FileRoutesByTo {
   '/configuracoes/tipos/$typeId': typeof ConfiguracoesTiposTypeIdRoute
   '/levantamentos/$id/resumo': typeof LevantamentosIdResumoRoute
   '/levantamentos/$id': typeof LevantamentosIdIndexRoute
+  '/api/public/photo/$': typeof ApiPublicPhotoSplatRoute
   '/clientes/$id/dados-ambientais/$recordId': typeof ClientesIdDadosAmbientaisRecordIdRoute
   '/clientes/$id/levantamentos/$surveyId': typeof ClientesIdLevantamentosSurveyIdRoute
 }
@@ -170,6 +178,7 @@ export interface FileRoutesById {
   '/configuracoes/tipos/$typeId': typeof ConfiguracoesTiposTypeIdRoute
   '/levantamentos/$id/resumo': typeof LevantamentosIdResumoRoute
   '/levantamentos/$id/': typeof LevantamentosIdIndexRoute
+  '/api/public/photo/$': typeof ApiPublicPhotoSplatRoute
   '/clientes/$id/dados-ambientais/$recordId': typeof ClientesIdDadosAmbientaisRecordIdRoute
   '/clientes/$id/levantamentos/$surveyId': typeof ClientesIdLevantamentosSurveyIdRoute
 }
@@ -191,6 +200,7 @@ export interface FileRouteTypes {
     | '/configuracoes/tipos/$typeId'
     | '/levantamentos/$id/resumo'
     | '/levantamentos/$id/'
+    | '/api/public/photo/$'
     | '/clientes/$id/dados-ambientais/$recordId'
     | '/clientes/$id/levantamentos/$surveyId'
   fileRoutesByTo: FileRoutesByTo
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
     | '/configuracoes/tipos/$typeId'
     | '/levantamentos/$id/resumo'
     | '/levantamentos/$id'
+    | '/api/public/photo/$'
     | '/clientes/$id/dados-ambientais/$recordId'
     | '/clientes/$id/levantamentos/$surveyId'
   id:
@@ -228,6 +239,7 @@ export interface FileRouteTypes {
     | '/configuracoes/tipos/$typeId'
     | '/levantamentos/$id/resumo'
     | '/levantamentos/$id/'
+    | '/api/public/photo/$'
     | '/clientes/$id/dados-ambientais/$recordId'
     | '/clientes/$id/levantamentos/$surveyId'
   fileRoutesById: FileRoutesById
@@ -246,6 +258,7 @@ export interface RootRouteChildren {
   ProjetosIndexRoute: typeof ProjetosIndexRoute
   LevantamentosIdResumoRoute: typeof LevantamentosIdResumoRoute
   LevantamentosIdIndexRoute: typeof LevantamentosIdIndexRoute
+  ApiPublicPhotoSplatRoute: typeof ApiPublicPhotoSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -369,6 +382,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientesIdDadosAmbientaisRecordIdRouteImport
       parentRoute: typeof ClientesIdRoute
     }
+    '/api/public/photo/$': {
+      id: '/api/public/photo/$'
+      path: '/api/public/photo/$'
+      fullPath: '/api/public/photo/$'
+      preLoaderRoute: typeof ApiPublicPhotoSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -415,6 +435,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProjetosIndexRoute: ProjetosIndexRoute,
   LevantamentosIdResumoRoute: LevantamentosIdResumoRoute,
   LevantamentosIdIndexRoute: LevantamentosIdIndexRoute,
+  ApiPublicPhotoSplatRoute: ApiPublicPhotoSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

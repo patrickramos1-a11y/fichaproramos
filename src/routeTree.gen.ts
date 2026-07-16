@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ManutencaoRouteImport } from './routes/manutencao'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as IndexRouteImport } from './routes/index'
@@ -26,10 +27,16 @@ import { Route as LevantamentosIdResumoRouteImport } from './routes/levantamento
 import { Route as ConfiguracoesTiposTypeIdRouteImport } from './routes/configuracoes.tipos.$typeId'
 import { Route as ClientesIdLevantamentosSurveyIdRouteImport } from './routes/clientes.$id.levantamentos.$surveyId'
 import { Route as ClientesIdDadosAmbientaisRecordIdRouteImport } from './routes/clientes.$id.dados-ambientais.$recordId'
+import { Route as ApiPublicPhotoSplatRouteImport } from './routes/api/public/photo.$'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManutencaoRoute = ManutencaoRouteImport.update({
+  id: '/manutencao',
+  path: '/manutencao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -115,11 +122,17 @@ const ClientesIdDadosAmbientaisRecordIdRoute =
     path: '/dados-ambientais/$recordId',
     getParentRoute: () => ClientesIdRoute,
   } as any)
+const ApiPublicPhotoSplatRoute = ApiPublicPhotoSplatRouteImport.update({
+  id: '/api/public/photo/$',
+  path: '/api/public/photo/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/configuracoes': typeof ConfiguracoesRouteWithChildren
   '/login': typeof LoginRoute
+  '/manutencao': typeof ManutencaoRoute
   '/reset-password': typeof ResetPasswordRoute
   '/clientes/$id': typeof ClientesIdRouteWithChildren
   '/levantamentos/novo': typeof LevantamentosNovoRoute
@@ -132,12 +145,14 @@ export interface FileRoutesByFullPath {
   '/configuracoes/tipos/$typeId': typeof ConfiguracoesTiposTypeIdRoute
   '/levantamentos/$id/resumo': typeof LevantamentosIdResumoRoute
   '/levantamentos/$id/': typeof LevantamentosIdIndexRoute
+  '/api/public/photo/$': typeof ApiPublicPhotoSplatRoute
   '/clientes/$id/dados-ambientais/$recordId': typeof ClientesIdDadosAmbientaisRecordIdRoute
   '/clientes/$id/levantamentos/$surveyId': typeof ClientesIdLevantamentosSurveyIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/manutencao': typeof ManutencaoRoute
   '/reset-password': typeof ResetPasswordRoute
   '/clientes/$id': typeof ClientesIdRouteWithChildren
   '/levantamentos/novo': typeof LevantamentosNovoRoute
@@ -150,6 +165,7 @@ export interface FileRoutesByTo {
   '/configuracoes/tipos/$typeId': typeof ConfiguracoesTiposTypeIdRoute
   '/levantamentos/$id/resumo': typeof LevantamentosIdResumoRoute
   '/levantamentos/$id': typeof LevantamentosIdIndexRoute
+  '/api/public/photo/$': typeof ApiPublicPhotoSplatRoute
   '/clientes/$id/dados-ambientais/$recordId': typeof ClientesIdDadosAmbientaisRecordIdRoute
   '/clientes/$id/levantamentos/$surveyId': typeof ClientesIdLevantamentosSurveyIdRoute
 }
@@ -158,6 +174,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/configuracoes': typeof ConfiguracoesRouteWithChildren
   '/login': typeof LoginRoute
+  '/manutencao': typeof ManutencaoRoute
   '/reset-password': typeof ResetPasswordRoute
   '/clientes/$id': typeof ClientesIdRouteWithChildren
   '/levantamentos/novo': typeof LevantamentosNovoRoute
@@ -170,6 +187,7 @@ export interface FileRoutesById {
   '/configuracoes/tipos/$typeId': typeof ConfiguracoesTiposTypeIdRoute
   '/levantamentos/$id/resumo': typeof LevantamentosIdResumoRoute
   '/levantamentos/$id/': typeof LevantamentosIdIndexRoute
+  '/api/public/photo/$': typeof ApiPublicPhotoSplatRoute
   '/clientes/$id/dados-ambientais/$recordId': typeof ClientesIdDadosAmbientaisRecordIdRoute
   '/clientes/$id/levantamentos/$surveyId': typeof ClientesIdLevantamentosSurveyIdRoute
 }
@@ -179,6 +197,7 @@ export interface FileRouteTypes {
     | '/'
     | '/configuracoes'
     | '/login'
+    | '/manutencao'
     | '/reset-password'
     | '/clientes/$id'
     | '/levantamentos/novo'
@@ -191,12 +210,14 @@ export interface FileRouteTypes {
     | '/configuracoes/tipos/$typeId'
     | '/levantamentos/$id/resumo'
     | '/levantamentos/$id/'
+    | '/api/public/photo/$'
     | '/clientes/$id/dados-ambientais/$recordId'
     | '/clientes/$id/levantamentos/$surveyId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/manutencao'
     | '/reset-password'
     | '/clientes/$id'
     | '/levantamentos/novo'
@@ -209,6 +230,7 @@ export interface FileRouteTypes {
     | '/configuracoes/tipos/$typeId'
     | '/levantamentos/$id/resumo'
     | '/levantamentos/$id'
+    | '/api/public/photo/$'
     | '/clientes/$id/dados-ambientais/$recordId'
     | '/clientes/$id/levantamentos/$surveyId'
   id:
@@ -216,6 +238,7 @@ export interface FileRouteTypes {
     | '/'
     | '/configuracoes'
     | '/login'
+    | '/manutencao'
     | '/reset-password'
     | '/clientes/$id'
     | '/levantamentos/novo'
@@ -228,6 +251,7 @@ export interface FileRouteTypes {
     | '/configuracoes/tipos/$typeId'
     | '/levantamentos/$id/resumo'
     | '/levantamentos/$id/'
+    | '/api/public/photo/$'
     | '/clientes/$id/dados-ambientais/$recordId'
     | '/clientes/$id/levantamentos/$surveyId'
   fileRoutesById: FileRoutesById
@@ -236,6 +260,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConfiguracoesRoute: typeof ConfiguracoesRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ManutencaoRoute: typeof ManutencaoRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ClientesIdRoute: typeof ClientesIdRouteWithChildren
   LevantamentosNovoRoute: typeof LevantamentosNovoRoute
@@ -246,6 +271,7 @@ export interface RootRouteChildren {
   ProjetosIndexRoute: typeof ProjetosIndexRoute
   LevantamentosIdResumoRoute: typeof LevantamentosIdResumoRoute
   LevantamentosIdIndexRoute: typeof LevantamentosIdIndexRoute
+  ApiPublicPhotoSplatRoute: typeof ApiPublicPhotoSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -255,6 +281,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manutencao': {
+      id: '/manutencao'
+      path: '/manutencao'
+      fullPath: '/manutencao'
+      preLoaderRoute: typeof ManutencaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -369,6 +402,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientesIdDadosAmbientaisRecordIdRouteImport
       parentRoute: typeof ClientesIdRoute
     }
+    '/api/public/photo/$': {
+      id: '/api/public/photo/$'
+      path: '/api/public/photo/$'
+      fullPath: '/api/public/photo/$'
+      preLoaderRoute: typeof ApiPublicPhotoSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -405,6 +445,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConfiguracoesRoute: ConfiguracoesRouteWithChildren,
   LoginRoute: LoginRoute,
+  ManutencaoRoute: ManutencaoRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ClientesIdRoute: ClientesIdRouteWithChildren,
   LevantamentosNovoRoute: LevantamentosNovoRoute,
@@ -415,17 +456,8 @@ const rootRouteChildren: RootRouteChildren = {
   ProjetosIndexRoute: ProjetosIndexRoute,
   LevantamentosIdResumoRoute: LevantamentosIdResumoRoute,
   LevantamentosIdIndexRoute: LevantamentosIdIndexRoute,
+  ApiPublicPhotoSplatRoute: ApiPublicPhotoSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

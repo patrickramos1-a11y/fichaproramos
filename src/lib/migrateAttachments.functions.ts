@@ -93,7 +93,7 @@ export const migrateAttachmentsBatch = createServerFn({ method: "POST" })
         row.data.modules = modules;
         const { error: updErr } = await supabaseAdmin
           .from("surveys")
-          .update({ data: row.data, updated_at: new Date().toISOString() })
+          .update({ data: row.data as unknown as never, updated_at: new Date().toISOString() })
           .eq("id", row.id);
         if (updErr) {
           console.error("[migrate] update falhou", row.id, updErr);

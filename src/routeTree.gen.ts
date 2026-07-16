@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ManutencaoRouteImport } from './routes/manutencao'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as IndexRouteImport } from './routes/index'
@@ -31,6 +32,11 @@ import { Route as ApiPublicPhotoSplatRouteImport } from './routes/api/public/pho
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManutencaoRoute = ManutencaoRouteImport.update({
+  id: '/manutencao',
+  path: '/manutencao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -126,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/configuracoes': typeof ConfiguracoesRouteWithChildren
   '/login': typeof LoginRoute
+  '/manutencao': typeof ManutencaoRoute
   '/reset-password': typeof ResetPasswordRoute
   '/clientes/$id': typeof ClientesIdRouteWithChildren
   '/levantamentos/novo': typeof LevantamentosNovoRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/manutencao': typeof ManutencaoRoute
   '/reset-password': typeof ResetPasswordRoute
   '/clientes/$id': typeof ClientesIdRouteWithChildren
   '/levantamentos/novo': typeof LevantamentosNovoRoute
@@ -166,6 +174,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/configuracoes': typeof ConfiguracoesRouteWithChildren
   '/login': typeof LoginRoute
+  '/manutencao': typeof ManutencaoRoute
   '/reset-password': typeof ResetPasswordRoute
   '/clientes/$id': typeof ClientesIdRouteWithChildren
   '/levantamentos/novo': typeof LevantamentosNovoRoute
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
     | '/'
     | '/configuracoes'
     | '/login'
+    | '/manutencao'
     | '/reset-password'
     | '/clientes/$id'
     | '/levantamentos/novo'
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/manutencao'
     | '/reset-password'
     | '/clientes/$id'
     | '/levantamentos/novo'
@@ -227,6 +238,7 @@ export interface FileRouteTypes {
     | '/'
     | '/configuracoes'
     | '/login'
+    | '/manutencao'
     | '/reset-password'
     | '/clientes/$id'
     | '/levantamentos/novo'
@@ -248,6 +260,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConfiguracoesRoute: typeof ConfiguracoesRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ManutencaoRoute: typeof ManutencaoRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ClientesIdRoute: typeof ClientesIdRouteWithChildren
   LevantamentosNovoRoute: typeof LevantamentosNovoRoute
@@ -268,6 +281,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manutencao': {
+      id: '/manutencao'
+      path: '/manutencao'
+      fullPath: '/manutencao'
+      preLoaderRoute: typeof ManutencaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -425,6 +445,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConfiguracoesRoute: ConfiguracoesRouteWithChildren,
   LoginRoute: LoginRoute,
+  ManutencaoRoute: ManutencaoRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ClientesIdRoute: ClientesIdRouteWithChildren,
   LevantamentosNovoRoute: LevantamentosNovoRoute,
